@@ -45,6 +45,7 @@ pnpm dev               # http://localhost:3000
 | `SESSION_SECRET` | 32+ char random string for session JWT signing (`openssl rand -hex 32`). |
 | `ENCRYPTION_KEY` | 32+ char random string for encrypting refresh tokens at rest. |
 | `PARENT_EMAILS` | Comma-separated parent emails. First signed-in user defaults to parent. |
+| `ALLOWED_EMAILS` | Comma-separated emails allowed to sign in. Empty = anyone can sign in. `PARENT_EMAILS` are always allowed. |
 | `SCRAPE_CRON` | Cron expression (Europe/Vilnius). Default `0 15 * * *`. |
 | `UPLOAD_DIR` | Directory for uploaded images (`./data/uploads` locally). |
 | `APP_URL` | Optional public origin override (defaults to the request origin). |

@@ -31,5 +31,5 @@ export async function saveUpload(file: File): Promise<{ imagePath: string }> {
   const dir = uploadDir();
   mkdirSync(dir, { recursive: true });
   writeFileSync(path.join(dir, name), bytes);
-  return { imagePath: `/uploads/${name}` };
+  return { imagePath: `/api/uploads/${name}` };
 }

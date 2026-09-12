@@ -11,12 +11,25 @@ import {
   type Role,
 } from "@/lib/repo";
 
+function envEmails(name: string): Set<string> {
+  return new Set(
+    (process.env[name] ?? "")
+      .split(",")
+      .map((e) => e.trim().toLowerCase())
+      .filter(Boolean),
+  );
+}
+
+// Allowlist: only ALLOWED_EMAILS + PARENT_EMAILS may sign in. If neither is
+// configured, sign-in is open (legacy/bootstrap behaviour).
+function isAllowedEmail(email: string): boolean {
+  const allowed = new Set([...envEmails("ALLOWED_EMAILS"), ...envEmails("PARENT_EMAILS")]);
+  if (allowed.size === 0) return true;
+  return allowed.has(email.toLowerCase());
+}
+
 function resolveRole(email: string): Role {
-  const parents = (process.env.PARENT_EMAILS ?? "")
-    .split(",")
-    .map((e) => e.trim().toLowerCase())
-    .filter(Boolean);
-  if (parents.includes(email.toLowerCase())) return "parent";
+  if (envEmails("PARENT_EMAILS").has(email.toLowerCase())) return "parent";
   // First signed-in user defaults to parent until PARENT_EMAILS is configured.
   if (listUsers().length === 0) return "parent";
   return "kid";
@@ -41,6 +54,9 @@ export async function GET(request: Request) {
   try {
     const tokens = await exchangeCode(code, redirectUri);
     const info = await fetchUserInfo(tokens.access_token);
+    if (!isAllowedEmail(info.email)) {
+      return NextResponse.redirect(new URL("/login?error=denied", url.origin));
+    }
     const encrypted = tokens.refresh_token ? encrypt(tokens.refresh_token) : null;
 
     const existing = getUserByGoogleSub(info.sub);
