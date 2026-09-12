@@ -60,9 +60,13 @@ jobs:
               HOMEWORK_SOURCE_HOMEWORK_PAGE HOMEWORK_SOURCE_USERNAME HOMEWORK_SOURCE_PASSWORD \
               HOMEWORK_SOURCE_REMEMBER_FIELD HOMEWORK_SOURCE_LOGIN_SUBMIT \
               HOMEWORK_SOURCE_USER_AGENT HOMEWORK_SOURCE_ACCEPT_LANGUAGE HOMEWORK_SOURCE_SEC_CH_UA HOMEWORK_SOURCE_PLATFORM; do
-              sed -i "/^${var}=/d" "$ENV_FILE"
               eval "val=\$$var"
-              printf '%s=%s\n' "$var" "$val" >> "$ENV_FILE"
+              # Skip empty values so an unset GitHub secret doesn't wipe an
+              # existing value already in the VPS .env.
+              if [ -n "$val" ]; then
+                sed -i "/^${var}=/d" "$ENV_FILE"
+                printf '%s=%s\n' "$var" "$val" >> "$ENV_FILE"
+              fi
             done
 
       - name: Copy compose file to VPS
