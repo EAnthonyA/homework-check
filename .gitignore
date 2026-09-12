@@ -37,6 +37,9 @@ yarn-error.log*
 .env*
 !.env.example
 
+# local act secrets (copy .secrets.act.example -> .secrets.act)
+.secrets.act
+
 # vercel
 .vercel
 

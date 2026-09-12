@@ -1,0 +1,9 @@
+# act configuration — local GitHub Actions runner
+# https://github.com/nektos/act
+#
+# Use the full Catthehacker Ubuntu image (has Node, Docker pre-installed).
+# ~800MB download on first run; cached after that.
+-P ubuntu-latest=ghcr.io/catthehacker/ubuntu:act-latest
+
+# Load local secrets (copy .secrets.act.example → .secrets.act and fill in values)
+--secret-file .secrets.act

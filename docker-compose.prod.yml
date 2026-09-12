@@ -1,0 +1,24 @@
+services:
+  app:
+    image: ${DOCKERHUB_USERNAME}/homework-check:${IMAGE_TAG:-latest}
+    container_name: homework-check-prod
+    expose:
+      - "3000"
+    environment:
+      DB_PATH: /data/app.db
+      UPLOAD_DIR: /data/uploads
+    env_file:
+      - .env
+    volumes:
+      - app-data:/data
+    restart: unless-stopped
+    networks:
+      - default
+      - shared-proxy
+
+volumes:
+  app-data:
+
+networks:
+  shared-proxy:
+    external: true

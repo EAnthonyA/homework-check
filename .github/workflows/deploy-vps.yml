@@ -1,0 +1,133 @@
+name: Deploy to VPS
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Deploy to VPS
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Create directory structure on VPS
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            mkdir -p ~/homework-check ~/lazyfood/nginx/conf.d
+
+      - name: Sync app secrets to VPS .env
+        uses: appleboy/ssh-action@v1
+        env:
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+          ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
+          PARENT_EMAILS: ${{ secrets.PARENT_EMAILS }}
+          APP_URL: ${{ secrets.APP_URL }}
+          SCRAPE_CRON: ${{ secrets.SCRAPE_CRON }}
+          HOMEWORK_SOURCE_BASE_URL: ${{ secrets.HOMEWORK_SOURCE_BASE_URL }}
+          HOMEWORK_SOURCE_LOGIN_PAGE: ${{ secrets.HOMEWORK_SOURCE_LOGIN_PAGE }}
+          HOMEWORK_SOURCE_LOGIN_ACTION: ${{ secrets.HOMEWORK_SOURCE_LOGIN_ACTION }}
+          HOMEWORK_SOURCE_HOMEWORK_PAGE: ${{ secrets.HOMEWORK_SOURCE_HOMEWORK_PAGE }}
+          HOMEWORK_SOURCE_USERNAME: ${{ secrets.HOMEWORK_SOURCE_USERNAME }}
+          HOMEWORK_SOURCE_PASSWORD: ${{ secrets.HOMEWORK_SOURCE_PASSWORD }}
+          HOMEWORK_SOURCE_REMEMBER_FIELD: ${{ secrets.HOMEWORK_SOURCE_REMEMBER_FIELD }}
+          HOMEWORK_SOURCE_LOGIN_SUBMIT: ${{ secrets.HOMEWORK_SOURCE_LOGIN_SUBMIT }}
+          HOMEWORK_SOURCE_USER_AGENT: ${{ secrets.HOMEWORK_SOURCE_USER_AGENT }}
+          HOMEWORK_SOURCE_ACCEPT_LANGUAGE: ${{ secrets.HOMEWORK_SOURCE_ACCEPT_LANGUAGE }}
+          HOMEWORK_SOURCE_SEC_CH_UA: ${{ secrets.HOMEWORK_SOURCE_SEC_CH_UA }}
+          HOMEWORK_SOURCE_PLATFORM: ${{ secrets.HOMEWORK_SOURCE_PLATFORM }}
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          envs: GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET,SESSION_SECRET,ENCRYPTION_KEY,PARENT_EMAILS,APP_URL,SCRAPE_CRON,HOMEWORK_SOURCE_BASE_URL,HOMEWORK_SOURCE_LOGIN_PAGE,HOMEWORK_SOURCE_LOGIN_ACTION,HOMEWORK_SOURCE_HOMEWORK_PAGE,HOMEWORK_SOURCE_USERNAME,HOMEWORK_SOURCE_PASSWORD,HOMEWORK_SOURCE_REMEMBER_FIELD,HOMEWORK_SOURCE_LOGIN_SUBMIT,HOMEWORK_SOURCE_USER_AGENT,HOMEWORK_SOURCE_ACCEPT_LANGUAGE,HOMEWORK_SOURCE_SEC_CH_UA,HOMEWORK_SOURCE_PLATFORM
+          script: |
+            set -e
+            ENV_FILE=~/homework-check/.env
+            touch "$ENV_FILE"
+
+            for var in \
+              GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET SESSION_SECRET ENCRYPTION_KEY \
+              PARENT_EMAILS APP_URL SCRAPE_CRON \
+              HOMEWORK_SOURCE_BASE_URL HOMEWORK_SOURCE_LOGIN_PAGE HOMEWORK_SOURCE_LOGIN_ACTION \
+              HOMEWORK_SOURCE_HOMEWORK_PAGE HOMEWORK_SOURCE_USERNAME HOMEWORK_SOURCE_PASSWORD \
+              HOMEWORK_SOURCE_REMEMBER_FIELD HOMEWORK_SOURCE_LOGIN_SUBMIT \
+              HOMEWORK_SOURCE_USER_AGENT HOMEWORK_SOURCE_ACCEPT_LANGUAGE HOMEWORK_SOURCE_SEC_CH_UA HOMEWORK_SOURCE_PLATFORM; do
+              sed -i "/^${var}=/d" "$ENV_FILE"
+              eval "val=\$$var"
+              printf '%s=%s\n' "$var" "$val" >> "$ENV_FILE"
+            done
+
+      - name: Copy compose file to VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          source: "docker-compose.prod.yml"
+          target: ~/homework-check
+
+      - name: Copy nginx vhost to lazy-food nginx
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          source: "nginx/conf.d/homework-check.conf"
+          target: ~/lazyfood
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          envs: DOCKERHUB_USERNAME,DOCKERHUB_TOKEN
+          script: |
+            set -e
+
+            cd ~/homework-check
+
+            # Ensure shared proxy network exists (lazy-food's nginx joins it)
+            docker network create shared-proxy || true
+
+            # Log in to Docker Hub to pull images
+            echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+
+            # Pull latest images
+            DOCKERHUB_USERNAME=$DOCKERHUB_USERNAME IMAGE_TAG=latest \
+            docker compose -f docker-compose.prod.yml pull
+
+            # Restart services
+            DOCKERHUB_USERNAME=$DOCKERHUB_USERNAME IMAGE_TAG=latest \
+            docker compose -f docker-compose.prod.yml up -d --remove-orphans
+
+            # Reload lazy-food nginx so the new pavilnys5b.lt vhost takes effect
+            docker exec lazyfood-nginx-prod nginx -s reload
+
+            # Clean up dangling images to save disk space
+            docker image prune -f
+
+            # Quick health check - query the app from inside its own container
+            # (no host port is published; nginx is the only public entry point).
+            echo "Waiting for app health check..."
+            for i in $(seq 1 12); do
+              if docker exec homework-check-prod node -e "fetch('http://localhost:3000/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"; then
+                echo "App is healthy."
+                exit 0
+              fi
+              echo "Attempt $i/12 - not ready yet, retrying in 5s..."
+              sleep 5
+            done
+            echo "Warning: app health check did not respond within 60s."
+            exit 1
