@@ -2,14 +2,13 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Calendar, Camera, Check, Loader2 } from "lucide-react";
-import { useTranslation } from "@/i18n/context";
+
 import { formatDateHuman } from "@/lib/timezone";
 import { Header } from "./header";
 import { BottomNav } from "./bottom-nav";
 import type { SessionProp, TodayResponse } from "./types";
 
 export function KidView({ session }: { session: SessionProp }) {
-  const { t, locale } = useTranslation();
   const queryClient = useQueryClient();
 
   const { data, isLoading, error } = useQuery<TodayResponse>({
@@ -43,21 +42,21 @@ export function KidView({ session }: { session: SessionProp }) {
       <Header session={session} />
 
       <div className="px-5 pt-6">
-        <h1 className="font-display text-2xl font-bold text-ink">{t("kid.title")}</h1>
-        <p className="mt-1 text-ink-soft">{t("kid.subtitle")}</p>
+        <h1 className="font-display text-2xl font-bold text-ink">Mano namų darbai</h1>
+        <p className="mt-1 text-ink-soft">Įkelk nuotrauką, kai atliksi</p>
       </div>
 
       <div className="mt-4 flex flex-col gap-4 px-5">
-        {isLoading && <p className="py-10 text-center text-ink-soft">{t("common.loading")}</p>}
+        {isLoading && <p className="py-10 text-center text-ink-soft">Kraunama…</p>}
         {error && (
           <p className="rounded-card bg-danger/10 p-4 text-sm font-medium text-danger">
-            {t("common.error")}
+            Įvyko klaida
           </p>
         )}
         {data && data.items.length === 0 && (
           <div className="rounded-card bg-surface p-8 text-center shadow-card">
             <div className="text-4xl">🎉</div>
-            <p className="mt-2 font-medium text-ink">{t("kid.empty")}</p>
+            <p className="mt-2 font-medium text-ink">Šiandien namų darbų nėra! 🎉</p>
           </div>
         )}
 
@@ -71,7 +70,7 @@ export function KidView({ session }: { session: SessionProp }) {
               <p className="mt-1 whitespace-pre-wrap text-ink-soft">{item.description}</p>
               <p className="mt-2 flex items-center gap-1 text-xs font-medium text-ink-soft">
                 <Calendar className="h-3.5 w-3.5" />
-                {t("common.due")}: {formatDateHuman(item.dueDate, locale)}
+                Atlikti iki: {formatDateHuman(item.dueDate)}
               </p>
 
               {mine ? (
@@ -79,16 +78,16 @@ export function KidView({ session }: { session: SessionProp }) {
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={mine.imagePath}
-                    alt={t("kid.done")}
+                    alt="Atlikta"
                     className="h-16 w-16 rounded-xl object-cover"
                   />
                   <div className="flex flex-col">
                     <span className="flex items-center gap-1 text-sm font-semibold text-success">
                       <Check className="h-4 w-4" />
-                      {t("kid.done")}
+                      Atlikta! ✅
                     </span>
                     <label className="mt-1 cursor-pointer text-xs font-medium text-ink-soft underline">
-                      {t("kid.replace")}
+                      Pakeisti nuotrauką
                       <input
                         type="file"
                         accept="image/*"
@@ -108,12 +107,12 @@ export function KidView({ session }: { session: SessionProp }) {
                     {uploading ? (
                       <>
                         <Loader2 className="h-4 w-4 animate-spin" />
-                        {t("kid.uploading")}
+                        Įkeliama…
                       </>
                     ) : (
                       <>
                         <Camera className="h-4 w-4" />
-                        {t("kid.upload")}
+                        Įkelti nuotrauką
                       </>
                     )}
                     <input
@@ -128,7 +127,7 @@ export function KidView({ session }: { session: SessionProp }) {
                       }}
                     />
                   </label>
-                  <p className="mt-2 text-center text-xs text-ink-soft">{t("kid.hint")}</p>
+                  <p className="mt-2 text-center text-xs text-ink-soft">Nufotografuok arba padaryk ekrano nuotrauką.</p>
                 </div>
               )}
             </div>

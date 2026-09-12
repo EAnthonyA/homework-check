@@ -1,18 +1,15 @@
 "use client";
 
-import { useTranslation } from "@/i18n/context";
 import type { SessionProp } from "./types";
 
 export function Header({ session }: { session: SessionProp }) {
-  const { t } = useTranslation();
-
   return (
     <header className="flex items-center justify-between px-5 pt-6">
       <div className="flex items-center gap-2">
         <span className="text-2xl" aria-hidden="true">
           📚
         </span>
-        <span className="font-display text-lg font-bold text-ink">{t("app.name")}</span>
+        <span className="font-display text-lg font-bold text-ink">Namų darbai</span>
       </div>
       <div className="flex items-center gap-2">
         <span className="hidden text-sm font-medium text-ink-soft sm:block">{session.name}</span>

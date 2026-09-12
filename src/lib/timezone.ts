@@ -22,10 +22,10 @@ export function isFutureOrToday(dateStr: string, today = vilniusDateString()): b
   return dateStr >= today;
 }
 
-export function formatDateHuman(dateStr: string, locale: "lt" | "en" = "lt"): string {
+export function formatDateHuman(dateStr: string): string {
   const [y, m, d] = dateStr.split("-").map(Number);
   const date = new Date(Date.UTC(y, m - 1, d));
-  return new Intl.DateTimeFormat(locale === "lt" ? "lt-LT" : "en-GB", {
+  return new Intl.DateTimeFormat("lt-LT", {
     timeZone: "UTC",
     weekday: "long",
     year: "numeric",
