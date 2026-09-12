@@ -1,0 +1,23 @@
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      DB_PATH: /data/app.db
+      UPLOAD_DIR: /data/uploads
+      # Fill the rest via an .env file next to this compose file:
+      #   GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, SESSION_SECRET,
+      #   ENCRYPTION_KEY, PARENT_EMAILS, SCRAPE_CRON,
+      #   HOMEWORK_SOURCE_BASE_URL, HOMEWORK_SOURCE_LOGIN_PAGE,
+      #   HOMEWORK_SOURCE_LOGIN_ACTION, HOMEWORK_SOURCE_HOMEWORK_PAGE,
+      #   HOMEWORK_SOURCE_USERNAME, HOMEWORK_SOURCE_PASSWORD,
+      #   HOMEWORK_SOURCE_REMEMBER_FIELD, HOMEWORK_SOURCE_LOGIN_SUBMIT
+    env_file:
+      - .env
+    volumes:
+      - app-data:/data
+    restart: unless-stopped
+
+volumes:
+  app-data:

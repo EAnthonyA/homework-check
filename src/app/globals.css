@@ -1,26 +1,53 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f9f9f9;
+  --foreground: #222222;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-surface: #ffffff;
+
+  /* Brand / kid-friendly palette */
+  --color-primary: #4d9e0e;
+  --color-primary-dark: #3b7a0a;
+  --color-accent: #f59300;
+  --color-danger: #e4175c;
+  --color-success: #07a357;
+  --color-ink: #222222;
+  --color-ink-soft: #7a7a7a;
+  --color-sky: #3b82f6;
+  --color-lemon: #ffd84d;
+
+  --font-sans: var(--font-roboto);
+  --font-display: var(--font-fredoka);
+  --font-mono: ui-monospace, monospace;
+
+  --radius-card: 16px;
+  --shadow-card: 0 10px 30px rgba(34, 34, 34, 0.05);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #f9f9f9;
+    --foreground: #222222;
   }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

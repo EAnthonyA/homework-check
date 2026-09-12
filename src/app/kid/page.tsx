@@ -1,8 +1,9 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
+import { KidView } from "@/components/kid-view";
 
-export default async function Home() {
+export default async function KidPage() {
   const session = await getSession();
   if (!session) redirect("/login");
-  redirect(session.role === "parent" ? "/dashboard" : "/kid");
+  return <KidView session={session} />;
 }

@@ -6,21 +6,32 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "scrape": "tsx scripts/scrape-cli.ts"
   },
   "dependencies": {
+    "@tanstack/react-query": "^5.102.8",
+    "cheerio": "^1.2.0",
+    "googleapis": "^180.0.0",
+    "jose": "^6.2.12",
+    "lucide-react": "^1.44.0",
     "next": "16.3.5",
+    "node-cron": "^4.6.0",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "zod": "^4.6.2"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
+    "@types/node": "^24.13.4",
+    "@types/node-cron": "^3.0.11",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.3.5",
     "tailwindcss": "^4",
+    "tsx": "^4.23.13",
     "typescript": "^5"
-  }
+  },
+  "packageManager": "pnpm@12.4.1"
 }
