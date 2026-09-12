@@ -11,7 +11,10 @@ export function startScheduler(): void {
   if (started) return;
   started = true;
 
-  const expression = process.env.SCRAPE_CRON ?? "0 15 * * *";
+  // `||` (not `??`) so an empty/whitespace env value falls back to the default;
+  // an empty string otherwise reaches node-cron and crashes startup with
+  // "pattern includes illegal characters".
+  const expression = process.env.SCRAPE_CRON?.trim() || "0 15 * * *";
   cron.schedule(
     expression,
     async () => {
