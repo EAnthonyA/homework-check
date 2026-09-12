@@ -2,14 +2,12 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { Calendar, Check, Clock } from "lucide-react";
-import { useTranslation } from "@/i18n/context";
 import { formatDateHuman } from "@/lib/timezone";
 import { Header } from "./header";
 import { BottomNav } from "./bottom-nav";
 import type { SessionProp, TodayResponse } from "./types";
 
 export function ParentDashboard({ session }: { session: SessionProp }) {
-  const { t, locale } = useTranslation();
   const { data, isLoading, error } = useQuery<TodayResponse>({
     queryKey: ["homework", "today"],
     queryFn: async () => {
@@ -24,21 +22,21 @@ export function ParentDashboard({ session }: { session: SessionProp }) {
       <Header session={session} />
 
       <div className="px-5 pt-6">
-        <h1 className="font-display text-2xl font-bold text-ink">{t("parent.title")}</h1>
-        <p className="mt-1 text-ink-soft">{t("parent.subtitle")}</p>
+        <h1 className="font-display text-2xl font-bold text-ink">Šiandienos namų darbai</h1>
+        <p className="mt-1 text-ink-soft">Ką reikia padaryti šiandien</p>
       </div>
 
       <div className="mt-4 flex flex-col gap-4 px-5">
-        {isLoading && <p className="py-10 text-center text-ink-soft">{t("common.loading")}</p>}
+        {isLoading && <p className="py-10 text-center text-ink-soft">Kraunama…</p>}
         {error && (
           <p className="rounded-card bg-danger/10 p-4 text-sm font-medium text-danger">
-            {t("common.error")}
+            Įvyko klaida
           </p>
         )}
         {data && data.items.length === 0 && (
           <div className="rounded-card bg-surface p-8 text-center shadow-card">
             <div className="text-4xl">🎉</div>
-            <p className="mt-2 font-medium text-ink">{t("parent.empty")}</p>
+            <p className="mt-2 font-medium text-ink">Šiandien namų darbų nėra. 🎉</p>
           </div>
         )}
         {data?.items.map((item) => {
@@ -51,18 +49,18 @@ export function ParentDashboard({ session }: { session: SessionProp }) {
                   <p className="mt-1 whitespace-pre-wrap text-ink-soft">{item.description}</p>
                   <p className="mt-2 flex items-center gap-1 text-xs font-medium text-ink-soft">
                     <Calendar className="h-3.5 w-3.5" />
-                    {t("common.due")}: {formatDateHuman(item.dueDate, locale)}
+                    Atlikti iki: {formatDateHuman(item.dueDate)}
                   </p>
                 </div>
                 {done ? (
                   <span className="flex shrink-0 items-center gap-1 rounded-full bg-success/10 px-3 py-1 text-xs font-semibold text-success">
                     <Check className="h-3.5 w-3.5" />
-                    {t("parent.doneBadge")}
+                    Atlikta
                   </span>
                 ) : (
                   <span className="flex shrink-0 items-center gap-1 rounded-full bg-accent/10 px-3 py-1 text-xs font-semibold text-accent">
                     <Clock className="h-3.5 w-3.5" />
-                    {t("parent.waitingBadge")}
+                    Laukiama
                   </span>
                 )}
               </div>
@@ -83,7 +81,7 @@ export function ParentDashboard({ session }: { session: SessionProp }) {
                         alt={s.userName}
                         className="h-5 w-5 rounded object-cover"
                       />
-                      {s.userName} · {t("parent.by")}
+                      {s.userName} · pateikė
                     </a>
                   ))}
                 </div>

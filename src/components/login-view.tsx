@@ -1,7 +1,5 @@
 "use client";
 
-import { useTranslation } from "@/i18n/context";
-
 function GoogleIcon() {
   return (
     <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
@@ -26,18 +24,16 @@ function GoogleIcon() {
 }
 
 export function LoginView({ error }: { error?: string }) {
-  const { t } = useTranslation();
-
   return (
     <main className="flex flex-1 flex-col items-center justify-center px-6 py-16">
       <div className="w-full max-w-sm rounded-card bg-surface p-8 text-center shadow-card">
         <div className="text-5xl">📚</div>
-        <h1 className="font-display mt-4 text-3xl font-bold text-ink">{t("app.name")}</h1>
-        <p className="mt-2 text-ink-soft">{t("app.tagline")}</p>
+        <h1 className="font-display mt-4 text-3xl font-bold text-ink">Namų darbai</h1>
+        <p className="mt-2 text-ink-soft">Visi namų darbai vienoje vietoje</p>
 
         {error && (
           <p className="mt-4 rounded-xl bg-danger/10 p-3 text-sm font-medium text-danger">
-            {t("common.error")}
+            Įvyko klaida
           </p>
         )}
 
@@ -46,10 +42,10 @@ export function LoginView({ error }: { error?: string }) {
           className="mt-8 flex w-full items-center justify-center gap-3 rounded-full bg-primary px-6 py-3.5 font-semibold text-white transition-colors hover:bg-primary-dark"
         >
           <GoogleIcon />
-          {t("login.google")}
+          Prisijungti su Google
         </a>
 
-        <p className="mt-6 text-xs text-ink-soft">{t("login.footer")}</p>
+        <p className="mt-6 text-xs text-ink-soft">Prisijungdamas sutinki su privatumo taisyklėmis.</p>
       </div>
     </main>
   );

@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { BookOpen, Settings } from "lucide-react";
-import { useTranslation } from "@/i18n/context";
 import type { Role } from "@/lib/repo";
 
 function NavLink({
@@ -31,10 +30,9 @@ function NavLink({
 }
 
 export function BottomNav({ role }: { role: Role }) {
-  const { t } = useTranslation();
   const pathname = usePathname();
   const homeHref = role === "parent" ? "/dashboard" : "/kid";
-  const homeLabel = role === "parent" ? t("nav.today") : t("nav.kid");
+  const homeLabel = role === "parent" ? "Šiandien" : "Mano darbai";
 
   return (
     <nav className="fixed inset-x-0 bottom-0 border-t border-black/5 bg-surface pb-[env(safe-area-inset-bottom)]">
@@ -49,7 +47,7 @@ export function BottomNav({ role }: { role: Role }) {
           href="/settings"
           active={pathname === "/settings"}
           icon={<Settings className="h-5 w-5" />}
-          label={t("nav.settings")}
+          label="Nustatymai"
         />
       </div>
     </nav>

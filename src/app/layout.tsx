@@ -1,9 +1,7 @@
 import type { Metadata } from "next";
 import { Roboto, Nunito } from "next/font/google";
-import { cookies } from "next/headers";
 import "./globals.css";
 import { Providers } from "@/components/providers";
-import { resolveLocale } from "@/i18n";
 
 const roboto = Roboto({
   variable: "--font-roboto",
@@ -21,14 +19,11 @@ export const metadata: Metadata = {
   description: "Visi namų darbai vienoje vietoje",
 };
 
-export default async function RootLayout({ children }: LayoutProps<"/">) {
-  const cookieStore = await cookies();
-  const locale = resolveLocale(cookieStore.get("lang")?.value);
-
+export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang={locale} className={`${roboto.variable} ${nunito.variable}`}>
+    <html lang="lt" className={`${roboto.variable} ${nunito.variable}`}>
       <body className="min-h-dvh bg-background text-foreground antialiased">
-        <Providers locale={locale}>
+        <Providers>
           <div className="mx-auto flex min-h-dvh w-full max-w-xl flex-col">{children}</div>
         </Providers>
       </body>

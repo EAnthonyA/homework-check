@@ -3,7 +3,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { Calendar, LogOut, RefreshCw } from "lucide-react";
-import { useTranslation } from "@/i18n/context";
 import { Header } from "./header";
 import { BottomNav } from "./bottom-nav";
 import type { SessionProp } from "./types";
@@ -37,7 +36,6 @@ function formatWhen(iso: string | null | undefined, never: string): string {
 }
 
 export function SettingsView({ session }: { session: SessionProp }) {
-  const { t } = useTranslation();
   const router = useRouter();
   const queryClient = useQueryClient();
   const isParent = session.role === "parent";
@@ -110,14 +108,14 @@ export function SettingsView({ session }: { session: SessionProp }) {
       <Header session={session} />
 
       <div className="px-5 pt-6">
-        <h1 className="font-display text-2xl font-bold text-ink">{t("settings.title")}</h1>
+        <h1 className="font-display text-2xl font-bold text-ink">Nustatymai</h1>
       </div>
 
       <div className="mt-4 flex flex-col gap-4 px-5">
         {/* Account */}
         <section className="rounded-card bg-surface p-5 shadow-card">
           <h2 className="font-display text-sm font-semibold uppercase tracking-wide text-ink-soft">
-            {t("settings.account")}
+            Paskyra
           </h2>
           <div className="mt-3 flex items-center justify-between">
             <div>
@@ -125,7 +123,7 @@ export function SettingsView({ session }: { session: SessionProp }) {
               <p className="text-sm text-ink-soft">{user?.email ?? session.email}</p>
             </div>
             <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary-dark">
-              {session.role === "parent" ? t("settings.roleParent") : t("settings.roleKid")}
+              {session.role === "parent" ? "Tėvas / mama" : "Vaikas"}
             </span>
           </div>
         </section>
@@ -135,13 +133,13 @@ export function SettingsView({ session }: { session: SessionProp }) {
           <div className="flex items-center gap-3">
             <Calendar className="h-5 w-5 text-primary" />
             <h2 className="font-display text-sm font-semibold uppercase tracking-wide text-ink-soft">
-              {t("settings.calendar")}
+              Google kalendorius
             </h2>
           </div>
-          <p className="mt-2 text-sm text-ink-soft">{t("settings.calendarDesc")}</p>
+          <p className="mt-2 text-sm text-ink-soft">Namų darbai automatiškai patenka į tavo kalendorių.</p>
           <div className="mt-3 flex items-center justify-between">
             <span className="text-sm font-medium text-ink">
-              {user?.calendarEnabled ? t("settings.calendarOn") : t("settings.calendarOff")}
+              {user?.calendarEnabled ? "Įjungtas" : "Išjungtas"}
             </span>
             <button
               type="button"
@@ -168,10 +166,10 @@ export function SettingsView({ session }: { session: SessionProp }) {
             <div className="flex items-center gap-3">
               <RefreshCw className="h-5 w-5 text-accent" />
               <h2 className="font-display text-sm font-semibold uppercase tracking-wide text-ink-soft">
-                {t("settings.scrape")}
+                Namų darbų atnaujinimas
               </h2>
             </div>
-            <p className="mt-2 text-sm text-ink-soft">{t("settings.scrapeDesc")}</p>
+            <p className="mt-2 text-sm text-ink-soft">Atnaujinti iš šaltinio dabar arba palaukti automatinio atnaujinimo 15:00.</p>
             <button
               type="button"
               disabled={scrapeNow.isPending}
@@ -179,16 +177,16 @@ export function SettingsView({ session }: { session: SessionProp }) {
               className="mt-3 flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-accent px-4 py-3 font-semibold text-white transition-colors hover:bg-accent/90 disabled:opacity-60"
             >
               <RefreshCw className={`h-4 w-4 ${scrapeNow.isPending ? "animate-spin" : ""}`} />
-              {scrapeNow.isPending ? t("settings.scraping") : t("settings.scrapeNow")}
+              {scrapeNow.isPending ? "Atnaujinama…" : "Atnaujinti dabar"}
             </button>
             {scrapeNow.isError && (
               <p className="mt-2 text-xs font-medium text-danger">
-                {t("common.error")}: {String(scrapeNow.error)}
+                Įvyko klaida: {String(scrapeNow.error)}
               </p>
             )}
             <p className="mt-2 text-xs text-ink-soft">
-              {t("settings.lastScrape")}:{" "}
-              {formatWhen(scrapeRun.data?.run?.finished_at, t("settings.never"))}
+              Paskutinis atnaujinimas:{" "}
+              {formatWhen(scrapeRun.data?.run?.finished_at, "Dar nebuvo")}
             </p>
           </section>
         )}
@@ -197,9 +195,9 @@ export function SettingsView({ session }: { session: SessionProp }) {
         {isParent && (
           <section className="rounded-card bg-surface p-5 shadow-card">
             <h2 className="font-display text-sm font-semibold uppercase tracking-wide text-ink-soft">
-              {t("settings.syncNow")}
+              Sinchronizuoti kalendorių
             </h2>
-            <p className="mt-2 text-sm text-ink-soft">{t("settings.syncDesc")}</p>
+            <p className="mt-2 text-sm text-ink-soft">Sukurti kalendoriaus įvykius visiems vartotojams.</p>
             <button
               type="button"
               disabled={syncCalendar.isPending}
@@ -207,7 +205,7 @@ export function SettingsView({ session }: { session: SessionProp }) {
               className="mt-3 flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-primary px-4 py-3 font-semibold text-white transition-colors hover:bg-primary-dark disabled:opacity-60"
             >
               <Calendar className="h-4 w-4" />
-              {t("settings.syncNow")}
+              Sinchronizuoti kalendorių
             </button>
             {syncCalendar.isSuccess && (
               <p className="mt-2 text-xs font-medium text-success">
@@ -225,7 +223,7 @@ export function SettingsView({ session }: { session: SessionProp }) {
           className="flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-danger/10 px-4 py-3 font-semibold text-danger transition-colors hover:bg-danger/15 disabled:opacity-60"
         >
           <LogOut className="h-4 w-4" />
-          {t("settings.signOut")}
+          Atsijungti
         </button>
       </div>
 
