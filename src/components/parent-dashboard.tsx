@@ -1,12 +1,22 @@
 "use client";
 
+import type { CSSProperties } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Calendar, Check, Clock } from "lucide-react";
-import { formatDateHuman } from "@/lib/timezone";
+import { formatDateHuman, vilniusDateString } from "@/lib/timezone";
 import { Header } from "./header";
 import { BottomNav } from "./bottom-nav";
 import { AiVerdict } from "./ai-verdict";
 import type { SessionProp, TodayResponse } from "./types";
+
+function shortDue(dateStr: string): string {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  return new Intl.DateTimeFormat("lt-LT", {
+    timeZone: "UTC",
+    weekday: "short",
+    month: "long",
+    day: "numeric",
+  }).format(new Date(Date.UTC(y, m - 1, d)));
+}
 
 export function ParentDashboard({ session }: { session: SessionProp }) {
   const { data, isLoading, error } = useQuery<TodayResponse>({
@@ -18,69 +28,75 @@ export function ParentDashboard({ session }: { session: SessionProp }) {
     },
   });
 
+  const todayHuman = formatDateHuman(vilniusDateString());
+
   return (
-    <main className="flex flex-1 flex-col pb-24">
+    <main className="flex flex-1 flex-col pb-28">
       <Header session={session} />
 
-      <div className="px-5 pt-6">
-        <h1 className="font-display text-2xl font-bold text-ink">Šiandienos namų darbai</h1>
-        <p className="mt-1 text-ink-soft">Ką reikia padaryti šiandien</p>
-      </div>
+      <section className="px-5 pt-8">
+        <p className="font-hand text-[1.35rem] leading-none text-pen-deep">{todayHuman}</p>
+        <h1 className="font-display mt-2 text-[2rem] font-black leading-[1.05] tracking-tight text-ink">
+          Šiandienos namų darbai
+        </h1>
+        <p className="mt-2.5 max-w-[38ch] text-[0.9375rem] leading-relaxed text-ink-soft">
+          Ką vaikai turi padaryti šiandien.
+        </p>
+      </section>
 
-      <div className="mt-4 flex flex-col gap-4 px-5">
-        {isLoading && <p className="py-10 text-center text-ink-soft">Kraunama…</p>}
+      <div className="mt-7 flex flex-col gap-5 px-5">
+        {isLoading && <p className="py-10 text-center text-ink-faint">Kraunama…</p>}
         {error && (
-          <p className="rounded-card bg-danger/10 p-4 text-sm font-medium text-danger">
-            Įvyko klaida
-          </p>
+          <p className="font-hand text-2xl text-pen-deep">✗ Įvyko klaida — atnaujink puslapį.</p>
         )}
         {data && data.items.length === 0 && (
-          <div className="rounded-card bg-surface p-8 text-center shadow-card">
-            <div className="text-4xl">🎉</div>
-            <p className="mt-2 font-medium text-ink">Šiandien namų darbų nėra. 🎉</p>
+          <div className="sheet anim-rise p-8 pl-10">
+            <p className="font-hand text-3xl leading-none text-leaf-deep">Laisvadienis!</p>
+            <p className="mt-2 text-ink-soft">Šiandien namų darbų nėra.</p>
           </div>
         )}
-        {data?.items.map((item) => {
+        {data?.items.map((item, i) => {
           const done = item.submissions.length > 0;
           return (
-            <div key={item.id} className="rounded-card bg-surface p-5 shadow-card">
+            <article
+              key={item.id}
+              className="sheet anim-rise p-5 pl-10 pr-5"
+              style={{ "--i": Math.min(i, 4) } as CSSProperties}
+            >
               <div className="flex items-start justify-between gap-3">
-                <div>
-                  <h2 className="font-display text-lg font-semibold text-ink">{item.subject}</h2>
-                  <p className="mt-1 whitespace-pre-wrap text-ink-soft">{item.description}</p>
-                  <p className="mt-2 flex items-center gap-1 text-xs font-medium text-ink-soft">
-                    <Calendar className="h-3.5 w-3.5" />
-                    Atlikti iki: {formatDateHuman(item.dueDate)}
+                <div className="min-w-0">
+                  <h2 className="font-display text-[1.35rem] font-bold leading-snug text-ink">
+                    {item.subject}
+                  </h2>
+                  <p className="mt-1 whitespace-pre-wrap text-[0.9375rem] leading-relaxed text-ink-soft">
+                    {item.description}
+                  </p>
+                  <p className="font-hand mt-2.5 text-xl leading-none text-ink-soft">
+                    Atlikti iki {shortDue(item.dueDate)}
                   </p>
                 </div>
                 {done ? (
-                  <span className="flex shrink-0 items-center gap-1 rounded-full bg-success/10 px-3 py-1 text-xs font-semibold text-success">
-                    <Check className="h-3.5 w-3.5" />
-                    Atlikta
-                  </span>
+                  <span className="font-hand shrink-0 text-2xl leading-none text-leaf-deep">Atlikta ✓</span>
                 ) : (
-                  <span className="flex shrink-0 items-center gap-1 rounded-full bg-accent/10 px-3 py-1 text-xs font-semibold text-accent">
-                    <Clock className="h-3.5 w-3.5" />
-                    Laukiama
-                  </span>
+                  <span className="font-hand shrink-0 text-2xl leading-none text-honey-deep">Laukia ✎</span>
                 )}
               </div>
 
               {item.submissions.length > 0 && (
-                <div className="mt-4 flex flex-col gap-2 border-t border-black/5 pt-3">
+                <div className="mt-4 flex flex-col gap-3 border-t border-dashed border-rule pt-4">
                   {item.submissions.map((s) => (
-                    <div key={s.userId} className="flex flex-wrap items-center gap-2">
+                    <div key={s.userId} className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
                       <a
                         href={s.imagePath}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary-dark"
+                        className="inline-flex items-center gap-2 rounded-full border border-rule bg-paper px-3 py-1 text-[0.8125rem] font-medium text-ink transition-colors hover:border-pen/40"
                       >
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                           src={s.imagePath}
                           alt={s.userName}
-                          className="h-5 w-5 rounded object-cover"
+                          className="h-5 w-5 rounded-full object-cover"
                         />
                         {s.userName} · pateikė
                       </a>
@@ -89,7 +105,7 @@ export function ParentDashboard({ session }: { session: SessionProp }) {
                   ))}
                 </div>
               )}
-            </div>
+            </article>
           );
         })}
       </div>

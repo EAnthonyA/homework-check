@@ -25,29 +25,31 @@ function GoogleIcon() {
 
 export function LoginView({ error }: { error?: string }) {
   return (
-    <main className="flex flex-1 flex-col items-center justify-center px-6 py-16">
-      <div className="w-full max-w-sm rounded-card bg-surface p-8 text-center shadow-card">
-        <div className="text-5xl">📚</div>
-        <h1 className="font-display mt-4 text-3xl font-bold text-ink">Namų darbai</h1>
-        <p className="mt-2 text-ink-soft">Visi namų darbai vienoje vietoje</p>
+    <main className="flex flex-1 flex-col justify-center px-5 py-16">
+      <div className="sheet anim-rise w-full p-8 pl-11 sm:p-10 sm:pl-12">
+        <p className="font-hand text-2xl leading-none text-pen-deep">šeimos sąsiuvinis</p>
+        <h1 className="font-display mt-3 text-[2.6rem] font-black leading-[0.95] tracking-tight text-ink">
+          Namų <em className="italic text-pen-deep">darbai</em>
+        </h1>
+        <p className="mt-4 max-w-[34ch] text-[0.95rem] leading-relaxed text-ink-soft">
+          Visi namų darbai vienoje vietoje. Nufotografuok, parodyk tėvams — ir sužinok, ar atlikta
+          teisingai.
+        </p>
 
         {error && (
-          <p className="mt-4 rounded-xl bg-danger/10 p-3 text-sm font-medium text-danger">
-            {error === "denied"
-              ? "Tik patvirtinti el. pašto adresai gali prisijungti."
-              : "Įvyko klaida"}
+          <p className="font-hand mt-5 text-2xl leading-snug text-pen-deep">
+            ✗ {error === "denied" ? "Tik patvirtinti el. pašto adresai gali prisijungti." : "Įvyko klaida — pabandyk dar kartą."}
           </p>
         )}
 
-        <a
-          href="/api/auth/login"
-          className="mt-8 flex w-full items-center justify-center gap-3 rounded-full bg-primary px-6 py-3.5 font-semibold text-white transition-colors hover:bg-primary-dark"
-        >
+        <a href="/api/auth/login" className="btn btn-outline mt-8 w-full">
           <GoogleIcon />
           Prisijungti su Google
         </a>
 
-        <p className="mt-6 text-xs text-ink-soft">Prisijungdamas sutinki su privatumo taisyklėmis.</p>
+        <p className="mt-5 text-xs leading-relaxed text-ink-faint">
+          Prisijungdamas sutinki su privatumo taisyklėmis.
+        </p>
       </div>
     </main>
   );

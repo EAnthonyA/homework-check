@@ -1,8 +1,37 @@
-import { CheckCircle2, CircleAlert, CircleX, Sparkles } from "lucide-react";
 import type { SubmissionView } from "./types";
 
-// Renders the AI evaluation verdict for a submission. Returns null when there
-// is nothing to show (not evaluated yet and no error).
+// Renders the AI evaluation as a teacher's hand-written margin note.
+// Returns null when there is nothing to show (not evaluated yet and no error).
+
+type Verdict =
+  | { kind: "none" }
+  | { kind: "error" }
+  | { kind: "notDone" }
+  | { kind: "done"; correct: boolean | null };
+
+const styles = {
+  error: { text: "text-slate", mark: "mark-slate", label: "Neįvertinta" },
+  notDone: { text: "text-pen-deep", mark: "mark-pen", label: "Neatlikta" },
+  wrong: { text: "text-honey-deep", mark: "mark-honey", label: "Yra klaidų" },
+  right: { text: "text-leaf-deep", mark: "mark-leaf", label: "Atlikta ir teisinga" },
+  done: { text: "text-leaf-deep", mark: "mark-leaf", label: "Atlikta" },
+} as const;
+
+function resolveVerdict(submission: SubmissionView): Verdict {
+  if (submission.aiError) return { kind: "error" };
+  if (submission.aiDone === null) return { kind: "none" };
+  if (submission.aiDone === false) return { kind: "notDone" };
+  return { kind: "done", correct: submission.aiCorrect };
+}
+
+function styleFor(v: Verdict) {
+  if (v.kind === "error") return styles.error;
+  if (v.kind === "notDone") return styles.notDone;
+  if (v.kind === "done" && v.correct === false) return styles.wrong;
+  if (v.kind === "done" && v.correct === true) return styles.right;
+  return styles.done;
+}
+
 export function AiVerdict({
   submission,
   compact = false,
@@ -10,50 +39,28 @@ export function AiVerdict({
   submission: SubmissionView;
   compact?: boolean;
 }) {
-  if (submission.aiDone === null && !submission.aiError) return null;
+  const v = resolveVerdict(submission);
+  if (v.kind === "none") return null;
 
-  if (submission.aiError) {
-    if (compact) {
-      return (
-        <span className="inline-flex items-center gap-1 rounded-full bg-ink-soft/10 px-2.5 py-1 text-xs font-medium text-ink-soft">
-          <Sparkles className="h-3.5 w-3.5" />
-          AI: neįvertinta
-        </span>
-      );
-    }
+  const s = styleFor(v);
+
+  const glyph = s === styles.error ? "—" : s === styles.wrong ? "△" : s === styles.notDone ? "✗" : "✓";
+
+  if (compact) {
     return (
-      <p className="flex items-center gap-1 text-xs font-medium text-ink-soft">
-        <Sparkles className="h-3.5 w-3.5" />
-        AI negalėjo įvertinti nuotraukos
-      </p>
+      <span className={`mark ${s.mark} font-hand text-xl leading-none ${s.text}`}>
+        {glyph} {s.label}
+      </span>
     );
   }
 
-  const { aiDone, aiCorrect } = submission;
-  const config = !aiDone
-    ? { Icon: CircleX, className: "bg-danger/10 text-danger", label: "AI: neatlikta" }
-    : aiCorrect === false
-      ? { Icon: CircleAlert, className: "bg-accent/10 text-accent", label: "AI: yra klaidų" }
-      : aiCorrect === true
-        ? { Icon: CheckCircle2, className: "bg-success/10 text-success", label: "AI: atlikta ir teisinga" }
-        : { Icon: CheckCircle2, className: "bg-primary/10 text-primary-dark", label: "AI: atlikta" };
-
-  const badge = (
-    <span
-      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${config.className}`}
-    >
-      <config.Icon className="h-3.5 w-3.5" />
-      {config.label}
-    </span>
-  );
-
-  if (compact) return badge;
-
   return (
-    <div className="mt-2">
-      {badge}
+    <div className="mt-3">
+      <span className={`mark ${s.mark} font-hand text-2xl leading-tight ${s.text}`}>
+        {glyph} {s.label}
+      </span>
       {submission.aiSummary && (
-        <p className="mt-1.5 text-xs text-ink-soft">{submission.aiSummary}</p>
+        <p className="font-hand mt-1.5 text-xl leading-snug text-ink-soft">{submission.aiSummary}</p>
       )}
     </div>
   );
