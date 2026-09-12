@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+import { getSession } from "@/lib/auth";
 import { uploadDir } from "@/lib/uploads";
 
 const MIME: Record<string, string> = {
@@ -13,6 +14,11 @@ const MIME: Record<string, string> = {
 };
 
 export async function GET(_req: Request, ctx: RouteContext<"/api/uploads/[name]">) {
+  const session = await getSession();
+  if (!session) {
+    return new Response("unauthorized", { status: 401 });
+  }
+
   const { name } = await ctx.params;
   const safe = path.basename(name);
   const ext = safe.split(".").pop()?.toLowerCase() ?? "";

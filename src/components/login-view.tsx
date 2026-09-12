@@ -33,7 +33,9 @@ export function LoginView({ error }: { error?: string }) {
 
         {error && (
           <p className="mt-4 rounded-xl bg-danger/10 p-3 text-sm font-medium text-danger">
-            Įvyko klaida
+            {error === "denied"
+              ? "Tik patvirtinti el. pašto adresai gali prisijungti."
+              : "Įvyko klaida"}
           </p>
         )}
 
