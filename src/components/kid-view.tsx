@@ -1,16 +1,39 @@
 "use client";
 
+import type { CSSProperties } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Calendar, Camera, Check, Loader2 } from "lucide-react";
+import { Camera, Loader2 } from "lucide-react";
 
-import { formatDateHuman } from "@/lib/timezone";
+import { formatDateHuman, vilniusDateString } from "@/lib/timezone";
 import { Header } from "./header";
 import { BottomNav } from "./bottom-nav";
 import { AiVerdict } from "./ai-verdict";
 import type { SessionProp, TodayResponse } from "./types";
 
+function shortDue(dateStr: string): string {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  return new Intl.DateTimeFormat("lt-LT", {
+    timeZone: "UTC",
+    weekday: "short",
+    month: "long",
+    day: "numeric",
+  }).format(new Date(Date.UTC(y, m - 1, d)));
+}
+
+function SkeletonCard() {
+  return (
+    <div className="sheet p-5 pl-10">
+      <div className="skeleton h-6 w-32" />
+      <div className="skeleton mt-3 h-4 w-full" />
+      <div className="skeleton mt-2 h-4 w-3/4" />
+      <div className="skeleton mt-4 h-11 w-full" />
+    </div>
+  );
+}
+
 export function KidView({ session }: { session: SessionProp }) {
   const queryClient = useQueryClient();
+  const todayHuman = formatDateHuman(vilniusDateString());
 
   const { data, isLoading, error } = useQuery<TodayResponse>({
     queryKey: ["homework", "today"],
@@ -39,56 +62,87 @@ export function KidView({ session }: { session: SessionProp }) {
   });
 
   return (
-    <main className="flex flex-1 flex-col pb-24">
+    <main className="flex flex-1 flex-col pb-28">
       <Header session={session} />
 
-      <div className="px-5 pt-6">
-        <h1 className="font-display text-2xl font-bold text-ink">Mano namų darbai</h1>
-        <p className="mt-1 text-ink-soft">Įkelk nuotrauką, kai atliksi</p>
-      </div>
+      <section className="px-5 pt-8">
+        <p className="font-hand text-[1.35rem] leading-none text-pen-deep">{todayHuman}</p>
+        <h1 className="font-display mt-2 text-[2rem] font-black leading-[1.05] tracking-tight text-ink">
+          Mano namų darbai
+        </h1>
+        <p className="mt-2.5 max-w-[38ch] text-[0.9375rem] leading-relaxed text-ink-soft">
+          Įkelk nuotrauką, kai atliksi — parašysiu, ar gerai.
+        </p>
+      </section>
 
-      <div className="mt-4 flex flex-col gap-4 px-5">
-        {isLoading && <p className="py-10 text-center text-ink-soft">Kraunama…</p>}
-        {error && (
-          <p className="rounded-card bg-danger/10 p-4 text-sm font-medium text-danger">
-            Įvyko klaida
-          </p>
-        )}
-        {data && data.items.length === 0 && (
-          <div className="rounded-card bg-surface p-8 text-center shadow-card">
-            <div className="text-4xl">🎉</div>
-            <p className="mt-2 font-medium text-ink">Šiandien namų darbų nėra! 🎉</p>
+      <div className="mt-7 flex flex-col gap-5 px-5">
+        {isLoading && (
+          <div className="flex flex-col gap-5">
+            <SkeletonCard />
+            <SkeletonCard />
           </div>
         )}
 
-        {data?.items.map((item) => {
+        {error && (
+          <p className="font-hand text-2xl text-pen-deep">✗ Įvyko klaida — atnaujink puslapį.</p>
+        )}
+
+        {data && data.items.length === 0 && (
+          <div className="sheet anim-rise p-8 pl-10">
+            <p className="font-hand text-3xl leading-none text-leaf-deep">Laisvadienis!</p>
+            <p className="mt-2 text-ink-soft">Šiandien namų darbų nėra. Gali ilsėtis. ✌</p>
+          </div>
+        )}
+
+        {data?.items.map((item, i) => {
           const mine = item.submissions.find((s) => s.userId === session.id);
+          const notDone = mine?.aiDone === false;
           const uploading = upload.isPending && upload.variables?.homeworkId === item.id;
 
           return (
-            <div key={item.id} className="rounded-card bg-surface p-5 shadow-card">
-              <h2 className="font-display text-lg font-semibold text-ink">{item.subject}</h2>
-              <p className="mt-1 whitespace-pre-wrap text-ink-soft">{item.description}</p>
-              <p className="mt-2 flex items-center gap-1 text-xs font-medium text-ink-soft">
-                <Calendar className="h-3.5 w-3.5" />
-                Atlikti iki: {formatDateHuman(item.dueDate)}
+            <article
+              key={item.id}
+              className="sheet anim-rise p-5 pl-10 pr-5"
+              style={{ "--i": Math.min(i, 4) } as CSSProperties}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <h2 className="font-display text-[1.35rem] font-bold leading-snug text-ink">
+                  {item.subject}
+                </h2>
+                {mine && (
+                  <span
+                    className={`font-hand mt-0.5 shrink-0 text-2xl leading-none ${
+                      notDone ? "text-pen-deep" : "text-leaf-deep"
+                    }`}
+                  >
+                    {notDone ? "Neatlikta ✗" : "Atlikta ✓"}
+                  </span>
+                )}
+              </div>
+
+              <p className="mt-1 whitespace-pre-wrap text-[0.9375rem] leading-relaxed text-ink-soft">
+                {item.description}
+              </p>
+              <p className="font-hand mt-2.5 text-xl leading-none text-ink-soft">
+                Atlikti iki {shortDue(item.dueDate)}
               </p>
 
               {mine ? (
-                <div className="mt-4 border-t border-black/5 pt-4">
+                <div className="mt-4 border-t border-dashed border-rule pt-4">
                   <div className="flex items-center gap-3">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={mine.imagePath}
                       alt="Atlikta"
-                      className="h-16 w-16 rounded-xl object-cover"
+                      className="h-16 w-16 rounded-lg border border-rule object-cover"
                     />
-                    <div className="flex flex-col">
-                      <span className="flex items-center gap-1 text-sm font-semibold text-success">
-                        <Check className="h-4 w-4" />
-                        Atlikta! ✅
-                      </span>
-                      <label className="mt-1 cursor-pointer text-xs font-medium text-ink-soft underline">
+                    <div className="min-w-0 flex-1">
+                      {notDone ? (
+                        <span className="font-hand text-xl leading-none text-pen-deep">Pataisyk</span>
+                      ) : (
+                        <span className="font-hand text-xl leading-none text-leaf-deep">Puiku!</span>
+                      )}
+                      <label className="mt-1 block cursor-pointer text-xs font-medium text-ink-soft underline decoration-dotted underline-offset-2 hover:text-ink">
                         Pakeisti nuotrauką
                         <input
                           type="file"
@@ -106,16 +160,16 @@ export function KidView({ session }: { session: SessionProp }) {
                   <AiVerdict submission={mine} />
                 </div>
               ) : (
-                <div className="mt-4 border-t border-black/5 pt-4">
-                  <label className="flex min-h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-full bg-primary px-4 py-3 font-semibold text-white transition-colors hover:bg-primary-dark">
+                <div className="mt-4 border-t border-dashed border-rule pt-4">
+                  <label className="btn btn-primary w-full">
                     {uploading ? (
                       <>
-                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <Loader2 className="h-[1.1rem] w-[1.1rem] animate-spin" />
                         Įkeliama ir vertinama…
                       </>
                     ) : (
                       <>
-                        <Camera className="h-4 w-4" />
+                        <Camera className="h-[1.1rem] w-[1.1rem]" />
                         Įkelti nuotrauką
                       </>
                     )}
@@ -131,10 +185,12 @@ export function KidView({ session }: { session: SessionProp }) {
                       }}
                     />
                   </label>
-                  <p className="mt-2 text-center text-xs text-ink-soft">Nufotografuok arba padaryk ekrano nuotrauką.</p>
+                  <p className="font-hand mt-2 text-center text-xl leading-none text-ink-faint">
+                    Nufotografuok arba padaryk ekrano nuotrauką
+                  </p>
                 </div>
               )}
-            </div>
+            </article>
           );
         })}
       </div>

@@ -1,30 +1,38 @@
 import type { Metadata } from "next";
-import { Roboto, Nunito } from "next/font/google";
+import { Caveat, Fraunces, Karla } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/providers";
 
-const roboto = Roboto({
-  variable: "--font-roboto",
+const karla = Karla({
+  variable: "--font-karla",
   subsets: ["latin", "latin-ext"],
-  weight: ["400", "500", "700"],
+  weight: ["400", "500", "600", "700"],
 });
 
-const nunito = Nunito({
-  variable: "--font-nunito",
+const fraunces = Fraunces({
+  variable: "--font-fraunces",
   subsets: ["latin", "latin-ext"],
+  weight: ["500", "600", "700", "900"],
+  style: ["normal", "italic"],
+});
+
+const caveat = Caveat({
+  variable: "--font-caveat",
+  subsets: ["latin", "latin-ext"],
+  weight: ["500", "600", "700"],
 });
 
 export const metadata: Metadata = {
   title: "Namų darbai",
-  description: "Visi namų darbai vienoje vietoje",
+  description: "Šeimos namų darbų sąsiuvinis — viskas vienoje vietoje",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="lt" className={`${roboto.variable} ${nunito.variable}`}>
-      <body className="min-h-dvh bg-background text-foreground antialiased">
+    <html lang="lt" className={`${karla.variable} ${fraunces.variable} ${caveat.variable}`}>
+      <body className="min-h-dvh bg-paper text-ink antialiased">
         <Providers>
-          <div className="mx-auto flex min-h-dvh w-full max-w-xl flex-col">{children}</div>
+          <div className="mx-auto flex min-h-dvh w-full max-w-[600px] flex-col">{children}</div>
         </Providers>
       </body>
     </html>

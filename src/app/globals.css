@@ -1,46 +1,164 @@
 @import "tailwindcss";
 
+@theme {
+  /* Paper */
+  --color-paper: #f5eedd;
+  --color-sheet: #fdfaf1;
+  --color-rule: #e5dbc2;
+
+  /* Ink */
+  --color-ink: #2c2e3b;
+  --color-ink-soft: #79705c;
+  --color-ink-faint: #a79b82;
+
+  /* Teacher's pen */
+  --color-pen: #c64233;
+  --color-pen-deep: #a22f22;
+
+  /* Grades */
+  --color-leaf: #3e8b4d;
+  --color-leaf-deep: #2f6d3b;
+  --color-honey: #d9923b;
+  --color-honey-deep: #a86a1f;
+  --color-slate: #4a6fa5;
+
+  /* Type */
+  --font-sans: var(--font-karla), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-fraunces), ui-serif, Georgia, serif;
+  --font-hand: var(--font-caveat), "Segoe Print", cursive;
+
+  --radius-card: 12px;
+}
+
 :root {
-  --background: #f9f9f9;
-  --foreground: #222222;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-surface: #ffffff;
-
-  /* Brand / kid-friendly palette */
-  --color-primary: #4d9e0e;
-  --color-primary-dark: #3b7a0a;
-  --color-accent: #f59300;
-  --color-danger: #e4175c;
-  --color-success: #07a357;
-  --color-ink: #222222;
-  --color-ink-soft: #7a7a7a;
-  --color-sky: #3b82f6;
-  --color-lemon: #ffd84d;
-
-  --font-sans: var(--font-roboto);
-  --font-display: var(--font-nunito);
-  --font-mono: ui-monospace, monospace;
-
-  --radius-card: 16px;
-  --shadow-card: 0 10px 30px rgba(34, 34, 34, 0.05);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #f9f9f9;
-    --foreground: #222222;
-  }
+  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+  background-color: var(--color-paper);
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent 26px,
+    color-mix(in oklab, var(--color-ink) 5%, transparent) 26px,
+    color-mix(in oklab, var(--color-ink) 5%, transparent) 27px
+  );
+  color: var(--color-ink);
+  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  text-rendering: optimizeLegibility;
 }
+
+::selection {
+  background: color-mix(in oklab, var(--color-pen) 24%, transparent);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-pen);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Notebook sheet with a red margin line */
+.sheet {
+  position: relative;
+  background-color: var(--color-sheet);
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-card);
+}
+.sheet::before {
+  content: "";
+  position: absolute;
+  top: 16px;
+  bottom: 16px;
+  left: 18px;
+  width: 2px;
+  border-radius: 2px;
+  background: color-mix(in oklab, var(--color-pen) 66%, transparent);
+}
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 48px;
+  padding: 0.7rem 1.25rem;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 0.9375rem;
+  line-height: 1.2;
+  cursor: pointer;
+  transition:
+    transform 0.12s var(--ease-out-quart),
+    background-color 0.15s var(--ease-out-quart),
+    border-color 0.15s var(--ease-out-quart),
+    color 0.15s var(--ease-out-quart);
+}
+.btn:active { transform: translateY(1px) scale(0.995); }
+.btn:disabled { opacity: 0.55; pointer-events: none; }
+
+.btn-primary { background: var(--color-ink); color: var(--color-sheet); }
+.btn-primary:hover { background: #1f2130; }
+
+.btn-outline {
+  background: #fffdf8;
+  color: var(--color-ink);
+  border: 1.5px solid color-mix(in oklab, var(--color-ink) 24%, transparent);
+}
+.btn-outline:hover { border-color: color-mix(in oklab, var(--color-ink) 62%, transparent); }
+
+.btn-danger {
+  background: color-mix(in oklab, var(--color-pen) 10%, transparent);
+  color: var(--color-pen-deep);
+}
+.btn-danger:hover { background: color-mix(in oklab, var(--color-pen) 16%, transparent); }
+
+/* Highlighter marks (teacher's pen) */
+.mark {
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+  padding: 0 0.18em;
+}
+.mark-pen { background-image: linear-gradient(0deg, color-mix(in oklab, var(--color-pen) 20%, transparent) 0%, color-mix(in oklab, var(--color-pen) 20%, transparent) 46%, transparent 46%); }
+.mark-leaf { background-image: linear-gradient(0deg, color-mix(in oklab, var(--color-leaf) 22%, transparent) 0%, color-mix(in oklab, var(--color-leaf) 22%, transparent) 46%, transparent 46%); }
+.mark-honey { background-image: linear-gradient(0deg, color-mix(in oklab, var(--color-honey) 30%, transparent) 0%, color-mix(in oklab, var(--color-honey) 30%, transparent) 46%, transparent 46%); }
+.mark-slate { background-image: linear-gradient(0deg, color-mix(in oklab, var(--color-slate) 22%, transparent) 0%, color-mix(in oklab, var(--color-slate) 22%, transparent) 46%, transparent 46%); }
+
+/* Skeleton */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: color-mix(in oklab, var(--color-rule) 60%, var(--color-paper));
+  border-radius: 8px;
+}
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(253, 250, 241, 0.85), transparent);
+  animation: shimmer 1.4s var(--ease-out-quart) infinite;
+}
+@keyframes shimmer {
+  100% { transform: translateX(100%); }
+}
+
+/* Entrances */
+@keyframes rise {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.anim-rise {
+  animation: rise 0.55s var(--ease-out-expo) both;
+  animation-delay: calc(var(--i, 0) * 70ms);
+}
+.anim-fade { animation: fade-in 0.5s var(--ease-out-expo) both; }
 
 @media (prefers-reduced-motion: reduce) {
   *,
