@@ -34,6 +34,11 @@ CREATE TABLE IF NOT EXISTS submissions (
   homework_id TEXT NOT NULL REFERENCES homework_items(id) ON DELETE CASCADE,
   image_path TEXT NOT NULL,
   note TEXT,
+  ai_done INTEGER,
+  ai_correct INTEGER,
+  ai_summary TEXT,
+  ai_error TEXT,
+  ai_evaluated_at TEXT,
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   UNIQUE(user_id, homework_id)
 );

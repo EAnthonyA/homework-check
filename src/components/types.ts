@@ -8,6 +8,18 @@ export interface SessionProp {
   role: Role;
 }
 
+export interface SubmissionView {
+  userId: string;
+  userName: string;
+  imagePath: string;
+  createdAt: string;
+  aiDone: boolean | null;
+  aiCorrect: boolean | null;
+  aiSummary: string | null;
+  aiError: string | null;
+  aiEvaluatedAt: string | null;
+}
+
 export interface HomeworkItemView {
   id: string;
   subject: string;
@@ -15,12 +27,7 @@ export interface HomeworkItemView {
   dueDate: string;
   details: string | null;
   mineDone: boolean;
-  submissions: {
-    userId: string;
-    userName: string;
-    imagePath: string;
-    createdAt: string;
-  }[];
+  submissions: SubmissionView[];
 }
 
 export interface TodayResponse {

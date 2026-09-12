@@ -24,6 +24,26 @@ export function getDb(): DatabaseSync {
   database.exec("PRAGMA journal_mode = WAL;");
   database.exec("PRAGMA foreign_keys = ON;");
   database.exec(SCHEMA_SQL);
+  migrate(database);
   instance = database;
   return database;
+}
+
+// Idempotent column migrations for pre-existing databases: SCHEMA_SQL only
+// creates tables if they don't exist, so columns added later need a manual
+// ALTER TABLE guarded by PRAGMA table_info.
+function migrate(database: DatabaseSync): void {
+  const submissions = database.prepare("PRAGMA table_info(submissions)").all() as Array<{
+    name: string;
+  }>;
+  const add = (name: string, definition: string) => {
+    if (!submissions.some((c) => c.name === name)) {
+      database.exec(`ALTER TABLE submissions ADD COLUMN ${definition}`);
+    }
+  };
+  add("ai_done", "ai_done INTEGER");
+  add("ai_correct", "ai_correct INTEGER");
+  add("ai_summary", "ai_summary TEXT");
+  add("ai_error", "ai_error TEXT");
+  add("ai_evaluated_at", "ai_evaluated_at TEXT");
 }

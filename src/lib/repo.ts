@@ -38,6 +38,11 @@ export interface SubmissionWithUser {
   homework_id: string;
   image_path: string;
   note: string | null;
+  ai_done: number | null;
+  ai_correct: number | null;
+  ai_summary: string | null;
+  ai_error: string | null;
+  ai_evaluated_at: string | null;
   created_at: string;
   user_name: string;
   user_role: Role;
@@ -193,15 +198,44 @@ export function listAllHomework(): HomeworkRow[] {
 // ---------- Submissions ----------
 
 const UPSERT_SUBMISSION_SQL = `
-  INSERT INTO submissions (id, user_id, homework_id, image_path, note)
-  VALUES (?, ?, ?, ?, ?)
+  INSERT INTO submissions (
+    id, user_id, homework_id, image_path, note,
+    ai_done, ai_correct, ai_summary, ai_error, ai_evaluated_at
+  )
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   ON CONFLICT(user_id, homework_id) DO UPDATE SET
     image_path = excluded.image_path,
     note = excluded.note,
+    ai_done = excluded.ai_done,
+    ai_correct = excluded.ai_correct,
+    ai_summary = excluded.ai_summary,
+    ai_error = excluded.ai_error,
+    ai_evaluated_at = excluded.ai_evaluated_at,
     created_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
 `;
-export function upsertSubmission(userId: string, homeworkId: string, imagePath: string, note?: string | null): void {
-  stmt(UPSERT_SUBMISSION_SQL).run(newId(), userId, homeworkId, imagePath, note ?? null);
+export function upsertSubmission(input: {
+  userId: string;
+  homeworkId: string;
+  imagePath: string;
+  note?: string | null;
+  aiDone?: boolean | null;
+  aiCorrect?: boolean | null;
+  aiSummary?: string | null;
+  aiError?: string | null;
+  aiEvaluatedAt?: string | null;
+}): void {
+  stmt(UPSERT_SUBMISSION_SQL).run(
+    newId(),
+    input.userId,
+    input.homeworkId,
+    input.imagePath,
+    input.note ?? null,
+    input.aiDone == null ? null : input.aiDone ? 1 : 0,
+    input.aiCorrect == null ? null : input.aiCorrect ? 1 : 0,
+    input.aiSummary ?? null,
+    input.aiError ?? null,
+    input.aiEvaluatedAt ?? null,
+  );
 }
 
 export function getSubmission(userId: string, homeworkId: string): SubmissionWithUser | undefined {

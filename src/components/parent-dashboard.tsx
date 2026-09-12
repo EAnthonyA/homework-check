@@ -5,6 +5,7 @@ import { Calendar, Check, Clock } from "lucide-react";
 import { formatDateHuman } from "@/lib/timezone";
 import { Header } from "./header";
 import { BottomNav } from "./bottom-nav";
+import { AiVerdict } from "./ai-verdict";
 import type { SessionProp, TodayResponse } from "./types";
 
 export function ParentDashboard({ session }: { session: SessionProp }) {
@@ -66,23 +67,25 @@ export function ParentDashboard({ session }: { session: SessionProp }) {
               </div>
 
               {item.submissions.length > 0 && (
-                <div className="mt-4 flex flex-wrap gap-2 border-t border-black/5 pt-3">
+                <div className="mt-4 flex flex-col gap-2 border-t border-black/5 pt-3">
                   {item.submissions.map((s) => (
-                    <a
-                      key={s.userId}
-                      href={s.imagePath}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary-dark"
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={s.imagePath}
-                        alt={s.userName}
-                        className="h-5 w-5 rounded object-cover"
-                      />
-                      {s.userName} · pateikė
-                    </a>
+                    <div key={s.userId} className="flex flex-wrap items-center gap-2">
+                      <a
+                        href={s.imagePath}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary-dark"
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={s.imagePath}
+                          alt={s.userName}
+                          className="h-5 w-5 rounded object-cover"
+                        />
+                        {s.userName} · pateikė
+                      </a>
+                      <AiVerdict submission={s} compact />
+                    </div>
                   ))}
                 </div>
               )}

@@ -6,6 +6,7 @@ import { Calendar, Camera, Check, Loader2 } from "lucide-react";
 import { formatDateHuman } from "@/lib/timezone";
 import { Header } from "./header";
 import { BottomNav } from "./bottom-nav";
+import { AiVerdict } from "./ai-verdict";
 import type { SessionProp, TodayResponse } from "./types";
 
 export function KidView({ session }: { session: SessionProp }) {
@@ -74,32 +75,35 @@ export function KidView({ session }: { session: SessionProp }) {
               </p>
 
               {mine ? (
-                <div className="mt-4 flex items-center gap-3 border-t border-black/5 pt-4">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={mine.imagePath}
-                    alt="Atlikta"
-                    className="h-16 w-16 rounded-xl object-cover"
-                  />
-                  <div className="flex flex-col">
-                    <span className="flex items-center gap-1 text-sm font-semibold text-success">
-                      <Check className="h-4 w-4" />
-                      Atlikta! ✅
-                    </span>
-                    <label className="mt-1 cursor-pointer text-xs font-medium text-ink-soft underline">
-                      Pakeisti nuotrauką
-                      <input
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) upload.mutate({ homeworkId: item.id, file });
-                          e.target.value = "";
-                        }}
-                      />
-                    </label>
+                <div className="mt-4 border-t border-black/5 pt-4">
+                  <div className="flex items-center gap-3">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={mine.imagePath}
+                      alt="Atlikta"
+                      className="h-16 w-16 rounded-xl object-cover"
+                    />
+                    <div className="flex flex-col">
+                      <span className="flex items-center gap-1 text-sm font-semibold text-success">
+                        <Check className="h-4 w-4" />
+                        Atlikta! ✅
+                      </span>
+                      <label className="mt-1 cursor-pointer text-xs font-medium text-ink-soft underline">
+                        Pakeisti nuotrauką
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) upload.mutate({ homeworkId: item.id, file });
+                            e.target.value = "";
+                          }}
+                        />
+                      </label>
+                    </div>
                   </div>
+                  <AiVerdict submission={mine} />
                 </div>
               ) : (
                 <div className="mt-4 border-t border-black/5 pt-4">
@@ -107,7 +111,7 @@ export function KidView({ session }: { session: SessionProp }) {
                     {uploading ? (
                       <>
                         <Loader2 className="h-4 w-4 animate-spin" />
-                        Įkeliama…
+                        Įkeliama ir vertinama…
                       </>
                     ) : (
                       <>

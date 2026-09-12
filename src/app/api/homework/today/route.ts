@@ -24,6 +24,11 @@ export async function GET() {
         userName: s.user_name,
         imagePath: s.image_path,
         createdAt: s.created_at,
+        aiDone: s.ai_done === null ? null : s.ai_done === 1,
+        aiCorrect: s.ai_correct === null ? null : s.ai_correct === 1,
+        aiSummary: s.ai_summary,
+        aiError: s.ai_error,
+        aiEvaluatedAt: s.ai_evaluated_at,
       })),
     };
   });
