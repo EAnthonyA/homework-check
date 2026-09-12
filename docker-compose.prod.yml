@@ -1,0 +1,17 @@
+services:
+  app:
+    image: ${DOCKERHUB_USERNAME}/homework-check:${IMAGE_TAG:-latest}
+    container_name: homework-check-prod
+    ports:
+      - "3000:3000"
+    environment:
+      DB_PATH: /data/app.db
+      UPLOAD_DIR: /data/uploads
+    env_file:
+      - .env
+    volumes:
+      - app-data:/data
+    restart: unless-stopped
+
+volumes:
+  app-data:
