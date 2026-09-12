@@ -1,14 +1,15 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { Check, Clock } from "lucide-react";
+import { Calendar, Check, Clock } from "lucide-react";
 import { useTranslation } from "@/i18n/context";
+import { formatDateHuman } from "@/lib/timezone";
 import { Header } from "./header";
 import { BottomNav } from "./bottom-nav";
 import type { SessionProp, TodayResponse } from "./types";
 
 export function ParentDashboard({ session }: { session: SessionProp }) {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const { data, isLoading, error } = useQuery<TodayResponse>({
     queryKey: ["homework", "today"],
     queryFn: async () => {
@@ -48,6 +49,10 @@ export function ParentDashboard({ session }: { session: SessionProp }) {
                 <div>
                   <h2 className="font-display text-lg font-semibold text-ink">{item.subject}</h2>
                   <p className="mt-1 whitespace-pre-wrap text-ink-soft">{item.description}</p>
+                  <p className="mt-2 flex items-center gap-1 text-xs font-medium text-ink-soft">
+                    <Calendar className="h-3.5 w-3.5" />
+                    {t("common.due")}: {formatDateHuman(item.dueDate, locale)}
+                  </p>
                 </div>
                 {done ? (
                   <span className="flex shrink-0 items-center gap-1 rounded-full bg-success/10 px-3 py-1 text-xs font-semibold text-success">

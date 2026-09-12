@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
-import { listHomeworkByDate, listSubmissionsForHomework } from "@/lib/repo";
+import { listHomeworkFrom, listSubmissionsForHomework } from "@/lib/repo";
 import { vilniusDateString } from "@/lib/timezone";
 
 export async function GET() {
@@ -10,7 +10,7 @@ export async function GET() {
   }
 
   const today = vilniusDateString();
-  const items = listHomeworkByDate(today).map((h) => {
+  const items = listHomeworkFrom(today).map((h) => {
     const submissions = listSubmissionsForHomework(h.id);
     return {
       id: h.id,

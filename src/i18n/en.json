@@ -50,5 +50,6 @@
   "common.close": "Close",
   "common.today": "Today",
   "common.subject": "Subject",
+  "common.due": "Due",
   "common.submitted": "Submitted"
 }

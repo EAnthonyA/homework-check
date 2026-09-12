@@ -1,14 +1,15 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Camera, Check, Loader2 } from "lucide-react";
+import { Calendar, Camera, Check, Loader2 } from "lucide-react";
 import { useTranslation } from "@/i18n/context";
+import { formatDateHuman } from "@/lib/timezone";
 import { Header } from "./header";
 import { BottomNav } from "./bottom-nav";
 import type { SessionProp, TodayResponse } from "./types";
 
 export function KidView({ session }: { session: SessionProp }) {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const queryClient = useQueryClient();
 
   const { data, isLoading, error } = useQuery<TodayResponse>({
@@ -68,6 +69,10 @@ export function KidView({ session }: { session: SessionProp }) {
             <div key={item.id} className="rounded-card bg-surface p-5 shadow-card">
               <h2 className="font-display text-lg font-semibold text-ink">{item.subject}</h2>
               <p className="mt-1 whitespace-pre-wrap text-ink-soft">{item.description}</p>
+              <p className="mt-2 flex items-center gap-1 text-xs font-medium text-ink-soft">
+                <Calendar className="h-3.5 w-3.5" />
+                {t("common.due")}: {formatDateHuman(item.dueDate, locale)}
+              </p>
 
               {mine ? (
                 <div className="mt-4 flex items-center gap-3 border-t border-black/5 pt-4">

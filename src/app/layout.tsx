@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Roboto, Fredoka } from "next/font/google";
+import { Roboto, Nunito } from "next/font/google";
 import { cookies } from "next/headers";
 import "./globals.css";
 import { Providers } from "@/components/providers";
@@ -7,13 +7,13 @@ import { resolveLocale } from "@/i18n";
 
 const roboto = Roboto({
   variable: "--font-roboto",
-  subsets: ["latin"],
+  subsets: ["latin", "latin-ext"],
   weight: ["400", "500", "700"],
 });
 
-const fredoka = Fredoka({
-  variable: "--font-fredoka",
-  subsets: ["latin"],
+const nunito = Nunito({
+  variable: "--font-nunito",
+  subsets: ["latin", "latin-ext"],
 });
 
 export const metadata: Metadata = {
@@ -26,7 +26,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   const locale = resolveLocale(cookieStore.get("lang")?.value);
 
   return (
-    <html lang={locale} className={`${roboto.variable} ${fredoka.variable}`}>
+    <html lang={locale} className={`${roboto.variable} ${nunito.variable}`}>
       <body className="min-h-dvh bg-background text-foreground antialiased">
         <Providers locale={locale}>
           <div className="mx-auto flex min-h-dvh w-full max-w-xl flex-col">{children}</div>

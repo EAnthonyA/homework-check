@@ -7,7 +7,6 @@ import { login, fetchHomeworkPage } from "./source";
 import { parseHomework } from "./parse";
 import { createScrapeRun, finishScrapeRun, upsertHomeworkItem, type HomeworkRow } from "../repo";
 import { sanitizeFreeText } from "../sanitize";
-import { vilniusDateString } from "../timezone";
 
 export interface ScrapeResult {
   itemsAdded: number;
@@ -36,8 +35,7 @@ export async function runScrape(): Promise<ScrapeResult> {
     const html = await fetchHomeworkPage(jar);
     dumpHtml(html);
 
-    const today = vilniusDateString();
-    const parsed = parseHomework(html, today);
+    const parsed = parseHomework(html);
     if (parsed.length === 0) {
       throw new Error("No homework entries parsed — check SCRAPER_DEBUG HTML dump and tune src/lib/scraper/parse.ts");
     }
