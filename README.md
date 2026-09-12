@@ -6,7 +6,7 @@ A small family app that keeps track of homework:
 - **Parses** homework items by date.
 - **Publishes** each item as an all-day event on every family member's own Google Calendar.
 - **Shows** today's homework to parents (with the kid's completion status) and to the kid.
-- **Lets the kid upload** a photo/screenshot of the finished homework, which marks it done.
+- **Lets the kid upload** a photo/screenshot of the finished homework, which marks it done and, when `GEMINI_API_KEY` is set, gets an AI verdict (done? correct?) via Gemini.
 
 ## Tech stack
 
@@ -24,7 +24,9 @@ A small family app that keeps track of homework:
    each event is created once, tracked in the `calendar_events` table).
 3. The web app serves a parent view (status of all submissions) and a kid view
    (upload per item → auto-marked done). Uploaded images are stored on local
-   disk under the configured upload directory.
+   disk under the configured upload directory and, when `GEMINI_API_KEY` is
+   set, evaluated by Gemini (done? correct?) with the verdict shown to both
+   kid and parents.
 
 ## Setup (local)
 
@@ -50,6 +52,8 @@ pnpm dev               # http://localhost:3000
 | `UPLOAD_DIR` | Directory for uploaded images (`./data/uploads` locally). |
 | `APP_URL` | Optional public origin override (defaults to the request origin). |
 | `SCRAPER_DEBUG` | `1` to dump the authenticated homework HTML to `./data/debug`. |
+| `GEMINI_API_KEY` | Google AI Studio API key. When set, every uploaded photo is sent to Gemini to judge whether the task is done and correct. Empty = skip AI evaluation. |
+| `GEMINI_VISION_MODEL` | Vision model used for photo evaluation (default `gemini-2.5-flash`). |
 
 ### Homework source (endpoints & credentials)
 

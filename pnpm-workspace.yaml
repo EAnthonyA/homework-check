@@ -1,5 +1,7 @@
 allowBuilds:
+  '@google/genai': false
   esbuild: true
+  protobufjs: false
   unrs-resolver: true
 minimumReleaseAgeExclude:
   - '@next/env@16.3.5'
