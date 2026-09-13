@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 function GoogleIcon() {
   return (
     <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
@@ -48,7 +50,15 @@ export function LoginView({ error }: { error?: string }) {
         </a>
 
         <p className="mt-5 text-xs leading-relaxed text-ink-faint">
-          Prisijungdamas sutinki su privatumo taisyklėmis.
+          Prisijungdamas sutinki su{" "}
+          <Link href="/terms" className="underline decoration-rule underline-offset-2 hover:text-ink">
+            naudojimo sąlygomis
+          </Link>{" "}
+          ir susipažįsti su{" "}
+          <Link href="/privacy" className="underline decoration-rule underline-offset-2 hover:text-ink">
+            privatumo taisyklėmis
+          </Link>
+          .
         </p>
       </div>
     </main>
