@@ -25,6 +25,8 @@ CREATE TABLE IF NOT EXISTS homework_items (
   due_date TEXT NOT NULL,
   details TEXT,
   assigned_date TEXT,
+  done_at TEXT,
+  done_by TEXT,
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 );

@@ -35,3 +35,17 @@ export interface TodayResponse {
   items: HomeworkItemView[];
   user: SessionProp;
 }
+
+export interface HistoryItemView {
+  id: string;
+  subject: string;
+  description: string;
+  dueDate: string;
+  doneAt: string;
+  doneDate: string;
+  doneByName: string | null;
+}
+
+export interface HistoryResponse {
+  items: HistoryItemView[];
+}

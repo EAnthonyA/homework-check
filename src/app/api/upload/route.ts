@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
-import { getHomeworkById, upsertSubmission } from "@/lib/repo";
+import { getHomeworkById, markHomeworkDone, upsertSubmission } from "@/lib/repo";
 import { saveUpload } from "@/lib/uploads";
 import { evaluateHomeworkImage, isAiConfigured } from "@/lib/ai";
+import { removeHomeworkFromCalendars } from "@/lib/calendar";
 
 export async function POST(request: Request) {
   const session = await getSession();
@@ -59,9 +60,18 @@ export async function POST(request: Request) {
       aiEvaluatedAt,
     });
 
+    // AI-approved homework is complete for the whole family: archive it and
+    // remove its calendar events.
+    const completed = ai?.done === true;
+    if (completed && !homework.done_at) {
+      markHomeworkDone(homeworkId, session.id);
+      await removeHomeworkFromCalendars(homeworkId);
+    }
+
     return NextResponse.json({
       ok: true,
       imagePath,
+      completed,
       ai: ai
         ? { done: ai.done, correct: ai.correct, summary: ai.summary }
         : null,

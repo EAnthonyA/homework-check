@@ -109,3 +109,35 @@ export async function syncAllUsers(items: HomeworkRow[]): Promise<{ created: num
   }
   return { created, failed };
 }
+
+// Deletes a homework item's calendar events from every user's calendar.
+export async function removeHomeworkFromCalendars(
+  homeworkId: string,
+): Promise<{ deleted: number; failed: number }> {
+  let deleted = 0;
+  let failed = 0;
+  for (const user of listUsers()) {
+    if (!user.calendar_enabled || !user.encrypted_refresh_token) continue;
+
+    const existing = getCalendarEvent(user.id, homeworkId);
+    if (!existing) continue;
+
+    const calendar = google.calendar({ version: "v3", auth: oauthForUser(user.encrypted_refresh_token) });
+    try {
+      await calendar.events.delete({ calendarId: "primary", eventId: existing.google_event_id });
+      deleteCalendarEvent(user.id, homeworkId);
+      deleted += 1;
+    } catch (err) {
+      const code = (err as { code?: number }).code;
+      if (code === 404 || code === 410) {
+        // 404 = never existed, 410 = already deleted on Google's side.
+        deleteCalendarEvent(user.id, homeworkId);
+        deleted += 1;
+      } else {
+        failed += 1;
+        console.error(`[calendar] failed to delete event for user=${user.id} item=${homeworkId}:`, err);
+      }
+    }
+  }
+  return { deleted, failed };
+}

@@ -30,19 +30,26 @@ export function Header({ session }: { session: SessionProp }) {
 
       <div className="flex items-center gap-2.5">
         <span className="hidden text-sm font-medium text-ink-soft sm:block">{session.name}</span>
-        {session.picture ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={session.picture}
-            alt={session.name}
-            referrerPolicy="no-referrer"
-            className="h-9 w-9 rounded-full border border-rule object-cover"
-          />
-        ) : (
-          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-pen/15 font-display text-[1.05rem] font-bold text-pen-deep">
-            {session.name.charAt(0).toUpperCase()}
-          </div>
-        )}
+        <Link
+          href="/settings"
+          aria-label="Nustatymai"
+          title="Nustatymai"
+          className="block rounded-full transition-transform duration-150 hover:scale-105 focus-visible:scale-105"
+        >
+          {session.picture ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={session.picture}
+              alt={session.name}
+              referrerPolicy="no-referrer"
+              className="h-9 w-9 rounded-full border border-rule object-cover"
+            />
+          ) : (
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-pen/15 font-display text-[1.05rem] font-bold text-pen-deep transition-colors hover:bg-pen/25">
+              {session.name.charAt(0).toUpperCase()}
+            </div>
+          )}
+        </Link>
       </div>
     </header>
   );
