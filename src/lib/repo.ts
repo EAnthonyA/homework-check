@@ -29,8 +29,14 @@ export interface HomeworkRow {
   due_date: string;
   details: string | null;
   assigned_date: string | null;
+  done_at: string | null;
+  done_by: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface HomeworkHistoryRow extends HomeworkRow {
+  done_by_name: string | null;
 }
 
 export interface SubmissionWithUser {
@@ -206,11 +212,29 @@ export function listHomeworkByDate(date: string): HomeworkRow[] {
 }
 
 export function listHomeworkFrom(date: string): HomeworkRow[] {
-  return stmt("SELECT * FROM homework_items WHERE due_date >= ? ORDER BY due_date ASC, subject ASC").all(date) as unknown as HomeworkRow[];
+  return stmt(
+    "SELECT * FROM homework_items WHERE due_date >= ? AND done_at IS NULL ORDER BY due_date ASC, subject ASC",
+  ).all(date) as unknown as HomeworkRow[];
 }
 
 export function listAllHomework(): HomeworkRow[] {
   return stmt("SELECT * FROM homework_items ORDER BY due_date ASC, subject ASC").all() as unknown as HomeworkRow[];
+}
+
+export function markHomeworkDone(id: string, doneBy: string): void {
+  stmt(
+    "UPDATE homework_items SET done_at = strftime('%Y-%m-%dT%H:%M:%fZ','now'), done_by = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?",
+  ).run(doneBy, id);
+}
+
+export function listHomeworkHistory(): HomeworkHistoryRow[] {
+  return stmt(`
+    SELECT h.*, u.name AS done_by_name
+    FROM homework_items h
+    LEFT JOIN users u ON u.id = h.done_by
+    WHERE h.done_at IS NOT NULL
+    ORDER BY h.done_at DESC, h.due_date DESC
+  `).all() as unknown as HomeworkHistoryRow[];
 }
 
 // ---------- Submissions ----------

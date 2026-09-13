@@ -6,7 +6,6 @@ import { Camera, Loader2 } from "lucide-react";
 
 import { formatDateHuman, vilniusDateString } from "@/lib/timezone";
 import { Header } from "./header";
-import { BottomNav } from "./bottom-nav";
 import { AiVerdict } from "./ai-verdict";
 import type { SessionProp, TodayResponse } from "./types";
 
@@ -62,7 +61,7 @@ export function KidView({ session }: { session: SessionProp }) {
   });
 
   return (
-    <main className="flex flex-1 flex-col pb-28">
+    <main className="flex flex-1 flex-col pb-10">
       <Header session={session} />
 
       <section className="px-5 pt-8">
@@ -194,8 +193,6 @@ export function KidView({ session }: { session: SessionProp }) {
           );
         })}
       </div>
-
-      <BottomNav role={session.role} />
     </main>
   );
 }

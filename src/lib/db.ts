@@ -53,4 +53,10 @@ function migrate(database: DatabaseSync): void {
   if (!homework.some((c) => c.name === "assigned_date")) {
     database.exec("ALTER TABLE homework_items ADD COLUMN assigned_date TEXT");
   }
+  if (!homework.some((c) => c.name === "done_at")) {
+    database.exec("ALTER TABLE homework_items ADD COLUMN done_at TEXT");
+  }
+  if (!homework.some((c) => c.name === "done_by")) {
+    database.exec("ALTER TABLE homework_items ADD COLUMN done_by TEXT");
+  }
 }

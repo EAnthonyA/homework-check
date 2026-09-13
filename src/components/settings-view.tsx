@@ -2,9 +2,9 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { Calendar, LogOut, RefreshCw } from "lucide-react";
+import Link from "next/link";
+import { Calendar, History, LogOut, RefreshCw } from "lucide-react";
 import { Header } from "./header";
-import { BottomNav } from "./bottom-nav";
 import type { SessionProp } from "./types";
 
 interface SettingsUser {
@@ -104,7 +104,7 @@ export function SettingsView({ session }: { session: SessionProp }) {
   const user = settings.data?.user;
 
   return (
-    <main className="flex flex-1 flex-col pb-28">
+    <main className="flex flex-1 flex-col pb-10">
       <Header session={session} />
 
       <section className="px-5 pt-8">
@@ -156,6 +156,20 @@ export function SettingsView({ session }: { session: SessionProp }) {
             </button>
           </div>
         </section>
+
+        {/* History (parent only) */}
+        {isParent && (
+          <section className="sheet p-5 pl-10">
+            <h2 className="font-display text-lg font-bold text-ink">Namų darbų istorija</h2>
+            <p className="mt-1 text-sm leading-relaxed text-ink-soft">
+              Pažymėti atlikti namų darbai.
+            </p>
+            <Link href="/history" className="btn btn-outline mt-4 w-full">
+              <History className="h-4 w-4" />
+              Peržiūrėti istoriją
+            </Link>
+          </section>
+        )}
 
         {/* Scrape (parent only) */}
         {isParent && (
@@ -220,8 +234,6 @@ export function SettingsView({ session }: { session: SessionProp }) {
           Atsijungti
         </button>
       </div>
-
-      <BottomNav role={session.role} />
     </main>
   );
 }
