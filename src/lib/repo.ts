@@ -28,6 +28,7 @@ export interface HomeworkRow {
   description: string;
   due_date: string;
   details: string | null;
+  assigned_date: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -145,12 +146,12 @@ export function getHomeworkBySourceId(sourceId: string): HomeworkRow | undefined
 }
 
 const INSERT_HOMEWORK_SQL = `
-  INSERT INTO homework_items (id, source_id, subject, description, due_date, details)
-  VALUES (?, ?, ?, ?, ?, ?)
+  INSERT INTO homework_items (id, source_id, subject, description, due_date, details, assigned_date)
+  VALUES (?, ?, ?, ?, ?, ?, ?)
 `;
 const UPDATE_HOMEWORK_SQL = `
   UPDATE homework_items
-  SET subject = ?, description = ?, due_date = ?, details = ?,
+  SET subject = ?, description = ?, due_date = ?, details = ?, assigned_date = ?,
       updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
   WHERE id = ?
 `;
@@ -161,6 +162,7 @@ export function upsertHomeworkItem(input: {
   description: string;
   dueDate: string;
   details?: string | null;
+  assignedDate?: string | null;
 }): { item: HomeworkRow; created: boolean; changed: boolean } {
   const existing = getHomeworkBySourceId(input.sourceId);
   if (existing) {
@@ -168,14 +170,30 @@ export function upsertHomeworkItem(input: {
       existing.subject !== input.subject ||
       existing.description !== input.description ||
       existing.due_date !== input.dueDate ||
-      (existing.details ?? null) !== (input.details ?? null);
+      (existing.details ?? null) !== (input.details ?? null) ||
+      (existing.assigned_date ?? null) !== (input.assignedDate ?? null);
     if (changed) {
-      stmt(UPDATE_HOMEWORK_SQL).run(input.subject, input.description, input.dueDate, input.details ?? null, existing.id);
+      stmt(UPDATE_HOMEWORK_SQL).run(
+        input.subject,
+        input.description,
+        input.dueDate,
+        input.details ?? null,
+        input.assignedDate ?? null,
+        existing.id,
+      );
       return { item: getHomeworkBySourceId(input.sourceId)!, created: false, changed: true };
     }
     return { item: existing, created: false, changed: false };
   }
-  stmt(INSERT_HOMEWORK_SQL).run(newId(), input.sourceId, input.subject, input.description, input.dueDate, input.details ?? null);
+  stmt(INSERT_HOMEWORK_SQL).run(
+    newId(),
+    input.sourceId,
+    input.subject,
+    input.description,
+    input.dueDate,
+    input.details ?? null,
+    input.assignedDate ?? null,
+  );
   return { item: getHomeworkBySourceId(input.sourceId)!, created: true, changed: false };
 }
 

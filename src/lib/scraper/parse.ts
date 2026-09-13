@@ -15,6 +15,7 @@ export interface ParsedHomeworkItem {
   subject: string;
   description: string;
   dueDate: string; // YYYY-MM-DD (the deadline)
+  assignedDate?: string; // YYYY-MM-DD ("Įvesta" — the day it was given)
   details?: string;
 }
 
@@ -42,6 +43,7 @@ export function parseHomework(html: string): ParsedHomeworkItem[] {
     if (cells.length < 5) return; // skip the <th> header row and empty rows
 
     const dueDate = normalizeIso(cells[4]) ?? normalizeIso(cells[0]);
+    const assignedDate = normalizeIso(cells[5]);
     const subject = cells[1];
     if (!dueDate || !subject) return;
 
@@ -49,6 +51,7 @@ export function parseHomework(html: string): ParsedHomeworkItem[] {
       subject,
       description: cells[3] || subject,
       dueDate,
+      assignedDate: assignedDate ?? undefined,
       details: cells[2] ? `Mokytojas: ${cells[2]}` : undefined,
     });
   });

@@ -2,12 +2,13 @@
 // own calendar (idempotent via the calendar_events table).
 import { google } from "googleapis";
 import { decrypt } from "./crypto";
-import { addDays } from "./timezone";
+import { addDays, vilniusDateString } from "./timezone";
 import {
   getUserById,
   listUsers,
   getCalendarEvent,
   upsertCalendarEvent,
+  deleteCalendarEvent,
   type HomeworkRow,
 } from "./repo";
 
@@ -18,6 +19,15 @@ function oauthForUser(encryptedRefreshToken: string) {
   );
   oauth.setCredentials({ refresh_token: decrypt(encryptedRefreshToken) });
   return oauth;
+}
+
+// The day the homework was assigned ("Įvesta" column), falling back to the day
+// it first appeared in the DB. Pinned to Europe/Vilnius and clamped so it never
+// starts after the deadline.
+function assignedDate(item: HomeworkRow): string {
+  const start = item.assigned_date ?? (item.created_at ? vilniusDateString(new Date(item.created_at)) : null);
+  if (!start) return item.due_date;
+  return start < item.due_date ? start : item.due_date;
 }
 
 export async function syncCalendarForUser(
@@ -34,24 +44,56 @@ export async function syncCalendarForUser(
   let failed = 0;
 
   for (const item of items) {
-    if (getCalendarEvent(userId, item.id)) continue; // already synced
+    const startDate = assignedDate(item);
+    const endDate = addDays(item.due_date, 1);
+    const requestBody = {
+      summary: item.subject,
+      description: item.description,
+      start: { date: startDate },
+      end: { date: endDate },
+    };
+
     try {
-      const res = await calendar.events.insert({
-        calendarId: "primary",
-        requestBody: {
-          summary: item.subject,
-          description: item.description,
-          start: { date: item.due_date },
-          end: { date: addDays(item.due_date, 1) },
-        },
-      });
-      if (res.data.id) {
-        upsertCalendarEvent(userId, item.id, res.data.id);
-        created += 1;
+      const existing = getCalendarEvent(userId, item.id);
+      if (existing) {
+        // Already synced — update in place if the dates/subject drifted.
+        try {
+          const current = await calendar.events.get({
+            calendarId: "primary",
+            eventId: existing.google_event_id,
+          });
+          const ev = current.data;
+          if (ev.start?.date !== startDate || ev.end?.date !== endDate || ev.summary !== item.subject) {
+            await calendar.events.patch({
+              calendarId: "primary",
+              eventId: existing.google_event_id,
+              requestBody,
+            });
+            console.log(`[calendar] updated event for user=${userId} item=${item.id} (${startDate}..${endDate})`);
+          }
+        } catch (err) {
+          // The event was deleted on Google's side — recreate it.
+          if ((err as { code?: number }).code === 404) {
+            deleteCalendarEvent(userId, item.id);
+            const res = await calendar.events.insert({ calendarId: "primary", requestBody });
+            if (res.data.id) {
+              upsertCalendarEvent(userId, item.id, res.data.id);
+              created += 1;
+            }
+          } else {
+            throw err;
+          }
+        }
+      } else {
+        const res = await calendar.events.insert({ calendarId: "primary", requestBody });
+        if (res.data.id) {
+          upsertCalendarEvent(userId, item.id, res.data.id);
+          created += 1;
+        }
       }
     } catch (err) {
       failed += 1;
-      console.error(`[calendar] failed to create event for user=${userId} item=${item.id}:`, err);
+      console.error(`[calendar] failed to sync event for user=${userId} item=${item.id}:`, err);
     }
   }
   return { created, failed };

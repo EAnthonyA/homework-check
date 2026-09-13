@@ -50,6 +50,7 @@ export async function runScrape(): Promise<ScrapeResult> {
         subject: sanitizeFreeText(p.subject, 200),
         description: sanitizeFreeText(p.description, 2000),
         dueDate: p.dueDate,
+        assignedDate: p.assignedDate,
         details: p.details ? sanitizeFreeText(p.details, 2000) : null,
       });
       items.push(result.item);
