@@ -37,6 +37,7 @@ function resolveRole(email: string): Role {
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
+  const origin = process.env.APP_URL || `${url.protocol}//${url.host}`;
   const code = url.searchParams.get("code");
   const state = url.searchParams.get("state");
 
@@ -45,10 +46,9 @@ export async function GET(request: Request) {
   store.delete("oauth-state");
 
   if (!code || !state || state !== savedState) {
-    return NextResponse.redirect(new URL("/login?error=state", url.origin));
+    return NextResponse.redirect(new URL("/login?error=state", origin));
   }
 
-  const origin = process.env.APP_URL ?? `${url.protocol}//${url.host}`;
   const redirectUri = `${origin}/api/auth/callback`;
 
   try {
@@ -96,9 +96,9 @@ export async function GET(request: Request) {
       maxAge: SESSION_MAX_AGE_SECONDS,
     });
 
-    return NextResponse.redirect(new URL("/", url.origin));
+    return NextResponse.redirect(new URL("/", origin));
   } catch (err) {
     console.error("[auth] callback error:", err);
-    return NextResponse.redirect(new URL("/login?error=auth", url.origin));
+    return NextResponse.redirect(new URL("/login?error=auth", origin));
   }
 }
