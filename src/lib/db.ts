@@ -46,4 +46,11 @@ function migrate(database: DatabaseSync): void {
   add("ai_summary", "ai_summary TEXT");
   add("ai_error", "ai_error TEXT");
   add("ai_evaluated_at", "ai_evaluated_at TEXT");
+
+  const homework = database.prepare("PRAGMA table_info(homework_items)").all() as Array<{
+    name: string;
+  }>;
+  if (!homework.some((c) => c.name === "assigned_date")) {
+    database.exec("ALTER TABLE homework_items ADD COLUMN assigned_date TEXT");
+  }
 }
