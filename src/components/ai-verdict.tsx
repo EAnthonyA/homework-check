@@ -62,6 +62,7 @@ export function AiVerdict({
       {submission.aiSummary && (
         <p className="font-hand mt-1.5 text-xl leading-snug text-ink-soft">{submission.aiSummary}</p>
       )}
+      {submission.aiError && <p className="mt-1.5 text-sm text-ink-soft">Nepavyko įvertinti. Nuotraukos išsaugotos peržiūrai.</p>}
     </div>
   );
 }

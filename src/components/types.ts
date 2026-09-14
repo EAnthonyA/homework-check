@@ -12,6 +12,7 @@ export interface SubmissionView {
   userId: string;
   userName: string;
   imagePath: string;
+  imagePaths: string[];
   createdAt: string;
   aiDone: boolean | null;
   aiCorrect: boolean | null;
@@ -44,6 +45,8 @@ export interface HistoryItemView {
   doneAt: string;
   doneDate: string;
   doneByName: string | null;
+  doneSource: "parent" | "ai" | null;
+  submissions: SubmissionView[];
 }
 
 export interface HistoryResponse {

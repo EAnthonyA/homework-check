@@ -217,7 +217,9 @@ export function SettingsView({ session }: { session: SessionProp }) {
             </button>
             {syncCalendar.isSuccess && (
               <p className="font-hand mt-2 text-xl text-leaf-deep">
-                OK (+{syncCalendar.data?.calendarCreated ?? 0})
+                {syncCalendar.data?.calendarFailed
+                  ? `Nepavyko sinchronizuoti ${syncCalendar.data.calendarFailed} įvykių. Bandyk dar kartą.`
+                  : `OK (+${syncCalendar.data?.calendarCreated ?? 0})`}
               </p>
             )}
           </section>

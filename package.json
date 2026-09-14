@@ -7,6 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test": "tsx --test tests/homework.test.mts",
+    "test:integration": "tsx --test tests/api.integration.mts",
     "scrape": "tsx scripts/scrape-cli.ts"
   },
   "dependencies": {

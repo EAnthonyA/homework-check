@@ -5,8 +5,9 @@ A small family app that keeps track of homework:
 - **Scrapes** an external school homework page (login + endpoints configured via env vars).
 - **Parses** homework items by date.
 - **Publishes** each item as an all-day event on every family member's own Google Calendar.
-- **Shows** today's homework to parents (with the kid's completion status) and to the kid.
-- **Lets the kid upload** a photo/screenshot of the finished homework, which marks it done and, when `GEMINI_API_KEY` is set, gets an AI verdict (done? correct?) via Gemini.
+- **Shows** unfinished homework, including overdue work, to parents and kids.
+- **Lets the kid submit 1–3 photos** together for one Gemini verdict (done? correct?). AI approval or a parent's action marks the homework complete.
+- **Keeps completion history** with the latest photos per kid, AI verdicts, and completion source. Parents can reopen work, preserving its evidence and restoring calendar events.
 
 ## Tech stack
 
@@ -22,13 +23,23 @@ A small family app that keeps track of homework:
    fetches the homework page and upserts parsed items into SQLite.
 2. After each scrape, every connected user's calendar is synced (idempotent —
    each event is created once, tracked in the `calendar_events` table).
-3. The web app serves a parent view (status of all submissions) and a kid view
-   (upload per item → auto-marked done). Uploaded images are stored on local
-   disk under the configured upload directory and, when `GEMINI_API_KEY` is
-   set, evaluated by Gemini (done? correct?) with the verdict shown to both
-   kid and parents.
+3. Kids select or photograph 1–3 pages (up to 10 MB each), preview them, and submit
+   all pages for one evaluation. The latest submission replaces the previous one
+   for that kid and homework. Files live on local disk behind authenticated URLs.
+4. When `GEMINI_API_KEY` is set, Gemini evaluates all pages together. `done: true`
+   completes the work, even if the verdict reports mistakes. Without AI, or if
+   evaluation fails, the photos remain available for parent review and the work
+   stays unfinished.
+5. Parents see photos and verdicts in both active work and completion history.
+   Reopening work clears its completion, keeps its evidence, and restores its
+   original calendar dates. Overdue work reappears in both active views.
+   Existing history whose completion source was not recorded uses a neutral label.
 
 ## Setup (local)
+
+Validation: `pnpm test` runs isolated regression tests; `pnpm lint` and `pnpm build`
+check the app. After building, `pnpm test:integration` exercises authenticated HTTP
+routes against a temporary database and upload directory, with AI disabled.
 
 Requirements: Node 24, pnpm.
 
@@ -52,7 +63,7 @@ pnpm dev               # http://localhost:3000
 | `UPLOAD_DIR` | Directory for uploaded images (`./data/uploads` locally). |
 | `APP_URL` | Optional public origin override (defaults to the request origin). |
 | `SCRAPER_DEBUG` | `1` to dump the authenticated homework HTML to `./data/debug`. |
-| `GEMINI_API_KEY` | Google AI Studio API key. When set, every uploaded photo is sent to Gemini to judge whether the task is done and correct. Empty = skip AI evaluation. |
+| `GEMINI_API_KEY` | Google AI Studio API key. When set, all photos in a submission are sent together to Gemini to judge whether the task is done and correct. Empty = save photos without AI evaluation. |
 | `GEMINI_VISION_MODEL` | Vision model used for photo evaluation (default `gemini-2.5-flash`). |
 
 ### Homework source (endpoints & credentials)

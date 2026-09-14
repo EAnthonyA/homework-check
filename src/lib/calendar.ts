@@ -5,12 +5,27 @@ import { decrypt } from "./crypto";
 import { addDays, vilniusDateString } from "./timezone";
 import {
   getUserById,
+  getHomeworkById,
   listUsers,
   getCalendarEvent,
   upsertCalendarEvent,
   deleteCalendarEvent,
   type HomeworkRow,
 } from "./repo";
+
+// Calendar requests can overlap with a parent reopening a just-completed item.
+// Serialize per user, then read current DB status before sending each request.
+const calendarQueues = new Map<string, Promise<unknown>>();
+async function withCalendarLock<T>(userId: string, work: () => Promise<T>): Promise<T> {
+  const previous = calendarQueues.get(userId) ?? Promise.resolve();
+  const pending = previous.catch(() => {}).then(work);
+  calendarQueues.set(userId, pending);
+  try {
+    return await pending;
+  } finally {
+    if (calendarQueues.get(userId) === pending) calendarQueues.delete(userId);
+  }
+}
 
 function oauthForUser(encryptedRefreshToken: string) {
   const oauth = new google.auth.OAuth2(
@@ -34,16 +49,31 @@ export async function syncCalendarForUser(
   userId: string,
   items: HomeworkRow[],
 ): Promise<{ created: number; failed: number }> {
+  return withCalendarLock(userId, () => syncCalendarForUserUnlocked(userId, items));
+}
+
+async function syncCalendarForUserUnlocked(
+  userId: string,
+  items: HomeworkRow[],
+): Promise<{ created: number; failed: number }> {
   const user = getUserById(userId);
   if (!user || !user.calendar_enabled || !user.encrypted_refresh_token) {
     return { created: 0, failed: 0 };
   }
 
-  const calendar = google.calendar({ version: "v3", auth: oauthForUser(user.encrypted_refresh_token) });
+  let calendar;
+  try {
+    calendar = google.calendar({ version: "v3", auth: oauthForUser(user.encrypted_refresh_token) });
+  } catch (error) {
+    console.error(`[calendar] could not authenticate user=${userId}:`, error);
+    return { created: 0, failed: items.length };
+  }
   let created = 0;
   let failed = 0;
 
-  for (const item of items) {
+  for (const requested of items) {
+    const item = getHomeworkById(requested.id);
+    if (!item || item.done_at) continue;
     const startDate = assignedDate(item);
     const endDate = addDays(item.due_date, 1);
     const requestBody = {
@@ -63,6 +93,7 @@ export async function syncCalendarForUser(
             eventId: existing.google_event_id,
           });
           const ev = current.data;
+          if (ev.status === "cancelled") throw Object.assign(new Error("Event was deleted"), { code: 410 });
           if (ev.start?.date !== startDate || ev.end?.date !== endDate || ev.summary !== item.subject) {
             await calendar.events.patch({
               calendarId: "primary",
@@ -73,7 +104,7 @@ export async function syncCalendarForUser(
           }
         } catch (err) {
           // The event was deleted on Google's side — recreate it.
-          if ((err as { code?: number }).code === 404) {
+          if ([404, 410].includes((err as { code: number }).code)) {
             deleteCalendarEvent(userId, item.id);
             const res = await calendar.events.insert({ calendarId: "primary", requestBody });
             if (res.data.id) {
@@ -119,25 +150,26 @@ export async function removeHomeworkFromCalendars(
   for (const user of listUsers()) {
     if (!user.calendar_enabled || !user.encrypted_refresh_token) continue;
 
-    const existing = getCalendarEvent(user.id, homeworkId);
-    if (!existing) continue;
-
-    const calendar = google.calendar({ version: "v3", auth: oauthForUser(user.encrypted_refresh_token) });
-    try {
-      await calendar.events.delete({ calendarId: "primary", eventId: existing.google_event_id });
-      deleteCalendarEvent(user.id, homeworkId);
-      deleted += 1;
-    } catch (err) {
-      const code = (err as { code?: number }).code;
-      if (code === 404 || code === 410) {
-        // 404 = never existed, 410 = already deleted on Google's side.
+    await withCalendarLock(user.id, async () => {
+      if (!getHomeworkById(homeworkId)?.done_at) return;
+      const existing = getCalendarEvent(user.id, homeworkId);
+      if (!existing) return;
+      try {
+        const calendar = google.calendar({ version: "v3", auth: oauthForUser(user.encrypted_refresh_token!) });
+        await calendar.events.delete({ calendarId: "primary", eventId: existing.google_event_id });
         deleteCalendarEvent(user.id, homeworkId);
         deleted += 1;
-      } else {
-        failed += 1;
-        console.error(`[calendar] failed to delete event for user=${user.id} item=${homeworkId}:`, err);
+      } catch (err) {
+        const code = (err as { code?: number }).code;
+        if (code === 404 || code === 410) {
+          deleteCalendarEvent(user.id, homeworkId);
+          deleted += 1;
+        } else {
+          failed += 1;
+          console.error(`[calendar] failed to delete event for user=${user.id} item=${homeworkId}:`, err);
+        }
       }
-    }
+    });
   }
   return { deleted, failed };
 }
