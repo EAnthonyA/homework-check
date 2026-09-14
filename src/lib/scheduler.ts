@@ -2,8 +2,7 @@
 import cron from "node-cron";
 import { runScrape } from "./scraper/run";
 import { syncAllUsers } from "./calendar";
-import { listHomeworkFrom } from "./repo";
-import { vilniusDateString } from "./timezone";
+import { listUnfinishedHomework } from "./repo";
 
 let started = false;
 
@@ -21,7 +20,7 @@ export function startScheduler(): void {
       console.log("[scheduler] running scrape at", new Date().toISOString());
       try {
         const result = await runScrape();
-        const sync = await syncAllUsers(listHomeworkFrom(vilniusDateString()));
+        const sync = await syncAllUsers(listUnfinishedHomework());
         console.log(
           `[scheduler] scrape done (+${result.itemsAdded} items, ~${result.itemsChanged} changed); ` +
             `calendar: +${sync.created} events`,

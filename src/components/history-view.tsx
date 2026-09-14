@@ -1,9 +1,11 @@
 "use client";
 
-import type { CSSProperties } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useState, type CSSProperties } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Loader2, Undo2 } from "lucide-react";
 import { formatDateHuman } from "@/lib/timezone";
 import { Header } from "./header";
+import { SubmissionEvidence } from "./submission-evidence";
 import type { SessionProp, HistoryResponse } from "./types";
 
 function shortDue(dateStr: string): string {
@@ -17,6 +19,21 @@ function shortDue(dateStr: string): string {
 }
 
 export function HistoryView({ session }: { session: SessionProp }) {
+  const queryClient = useQueryClient();
+  const [notice, setNotice] = useState("");
+  const reopen = useMutation({
+    mutationFn: async (homeworkId: string) => {
+      const response = await fetch(`/api/homework/${homeworkId}/done`, { method: "DELETE" });
+      if (!response.ok) throw new Error("Nepavyko grąžinti darbo. Bandyk dar kartą.");
+      return response.json() as Promise<{ calendarFailed: number }>;
+    },
+    onSuccess: (result) => {
+      setNotice(result.calendarFailed
+        ? "Darbas grąžintas į neatliktus. Kalendoriaus atnaujinti nepavyko — bandyk sinchronizuoti nustatymuose."
+        : "Darbas grąžintas į neatliktus. Jį vėl matote namų darbų sąraše.");
+      queryClient.invalidateQueries({ queryKey: ["homework"] });
+    },
+  });
   const { data, isLoading, error } = useQuery<HistoryResponse>({
     queryKey: ["homework", "history"],
     queryFn: async () => {
@@ -35,8 +52,10 @@ export function HistoryView({ session }: { session: SessionProp }) {
           Atliktų darbų istorija
         </h1>
         <p className="mt-2.5 max-w-[38ch] text-[0.9375rem] leading-relaxed text-ink-soft">
-          Viskas, ką jau atlikote.
+          Atlikti darbai, vaikų nuotraukos ir AI vertinimai.
         </p>
+        {notice && <p role="status" className="mt-4 text-sm text-ink">{notice}</p>}
+        {reopen.error && <p role="alert" className="mt-3 text-sm text-pen-deep">{reopen.error.message}</p>}
       </section>
 
       <div className="mt-7 flex flex-col gap-5 px-5">
@@ -71,9 +90,23 @@ export function HistoryView({ session }: { session: SessionProp }) {
               <span className="font-hand shrink-0 text-2xl leading-none text-leaf-deep">Atlikta ✓</span>
             </div>
             <p className="mt-3 text-xs text-ink-faint">
-              Pažymėta {formatDateHuman(item.doneDate)}
+              {item.doneSource === "ai" ? "AI pažymėta kaip atlikta" : item.doneSource === "parent" ? "Tėvų pažymėta kaip atlikta" : "Pažymėta kaip atlikta"}
+              {` · ${formatDateHuman(item.doneDate)}`}
               {item.doneByName ? ` · ${item.doneByName}` : ""}
             </p>
+            <div className="mt-4 flex flex-col gap-5 border-t border-dashed border-rule pt-4">
+              {item.submissions.length ? item.submissions.map((submission) => (
+                <SubmissionEvidence key={submission.userId} submission={submission} />
+              )) : <p className="text-sm text-ink-soft">Nuotraukų nepateikta.</p>}
+            </div>
+            {session.role === "parent" && (
+              <button type="button" className="btn btn-outline mt-4 w-full" disabled={reopen.isPending}
+                onClick={() => reopen.mutate(item.id)}>
+                {reopen.isPending && reopen.variables === item.id
+                  ? <><Loader2 className="h-4 w-4 animate-spin" /> Grąžinama…</>
+                  : <><Undo2 className="h-4 w-4" /> Pažymėti kaip neatliktą</>}
+              </button>
+            )}
           </article>
         ))}
       </div>

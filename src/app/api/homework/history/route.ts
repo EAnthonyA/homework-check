@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
-import { listHomeworkHistory } from "@/lib/repo";
+import { listHomeworkHistory, listSubmissionsForHomework } from "@/lib/repo";
+import { submissionView } from "@/lib/submission-view";
+import { sanitizeFreeText } from "@/lib/sanitize";
 import { vilniusDateString } from "@/lib/timezone";
 
 export async function GET() {
@@ -15,7 +17,9 @@ export async function GET() {
     dueDate: h.due_date,
     doneAt: h.done_at,
     doneDate: h.done_at ? vilniusDateString(new Date(h.done_at)) : h.due_date,
-    doneByName: h.done_by_name,
+    doneByName: h.done_by_name ? sanitizeFreeText(h.done_by_name, 200) : null,
+    doneSource: h.done_source,
+    submissions: listSubmissionsForHomework(h.id).map(submissionView),
   }));
 
   return NextResponse.json({ items });

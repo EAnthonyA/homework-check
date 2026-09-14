@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
-import { listHomeworkFrom, listSubmissionsForHomework } from "@/lib/repo";
+import { listUnfinishedHomework, listSubmissionsForHomework } from "@/lib/repo";
+import { submissionView } from "@/lib/submission-view";
 import { vilniusDateString } from "@/lib/timezone";
 
 export async function GET() {
@@ -10,7 +11,7 @@ export async function GET() {
   }
 
   const today = vilniusDateString();
-  const items = listHomeworkFrom(today).map((h) => {
+  const items = listUnfinishedHomework().map((h) => {
     const submissions = listSubmissionsForHomework(h.id);
     return {
       id: h.id,
@@ -18,18 +19,8 @@ export async function GET() {
       description: h.description,
       dueDate: h.due_date,
       details: h.details,
-      mineDone: submissions.some((s) => s.user_id === session.id),
-      submissions: submissions.map((s) => ({
-        userId: s.user_id,
-        userName: s.user_name,
-        imagePath: s.image_path,
-        createdAt: s.created_at,
-        aiDone: s.ai_done === null ? null : s.ai_done === 1,
-        aiCorrect: s.ai_correct === null ? null : s.ai_correct === 1,
-        aiSummary: s.ai_summary,
-        aiError: s.ai_error,
-        aiEvaluatedAt: s.ai_evaluated_at,
-      })),
+      mineDone: false,
+      submissions: submissions.map(submissionView),
     };
   });
 

@@ -31,6 +31,8 @@ export interface HomeworkRow {
   assigned_date: string | null;
   done_at: string | null;
   done_by: string | null;
+  done_source: "parent" | "ai" | null;
+  completion_version: number;
   created_at: string;
   updated_at: string;
 }
@@ -44,6 +46,7 @@ export interface SubmissionWithUser {
   user_id: string;
   homework_id: string;
   image_path: string;
+  image_paths: string | null;
   note: string | null;
   ai_done: number | null;
   ai_correct: number | null;
@@ -221,10 +224,20 @@ export function listAllHomework(): HomeworkRow[] {
   return stmt("SELECT * FROM homework_items ORDER BY due_date ASC, subject ASC").all() as unknown as HomeworkRow[];
 }
 
-export function markHomeworkDone(id: string, doneBy: string): void {
+export function listUnfinishedHomework(): HomeworkRow[] {
+  return stmt("SELECT * FROM homework_items WHERE done_at IS NULL ORDER BY due_date ASC, subject ASC").all() as unknown as HomeworkRow[];
+}
+
+export function markHomeworkDone(id: string, doneBy: string, source: "parent" | "ai" = "parent"): void {
   stmt(
-    "UPDATE homework_items SET done_at = strftime('%Y-%m-%dT%H:%M:%fZ','now'), done_by = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?",
-  ).run(doneBy, id);
+    "UPDATE homework_items SET done_at = strftime('%Y-%m-%dT%H:%M:%fZ','now'), done_by = ?, done_source = ?, completion_version = completion_version + 1, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ? AND done_at IS NULL",
+  ).run(doneBy, source, id);
+}
+
+export function reopenHomework(id: string): void {
+  stmt(
+    "UPDATE homework_items SET done_at = NULL, done_by = NULL, done_source = NULL, completion_version = completion_version + 1, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ? AND done_at IS NOT NULL",
+  ).run(id);
 }
 
 export function listHomeworkHistory(): HomeworkHistoryRow[] {
@@ -241,12 +254,13 @@ export function listHomeworkHistory(): HomeworkHistoryRow[] {
 
 const UPSERT_SUBMISSION_SQL = `
   INSERT INTO submissions (
-    id, user_id, homework_id, image_path, note,
+    id, user_id, homework_id, image_path, image_paths, note,
     ai_done, ai_correct, ai_summary, ai_error, ai_evaluated_at
   )
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   ON CONFLICT(user_id, homework_id) DO UPDATE SET
     image_path = excluded.image_path,
+    image_paths = excluded.image_paths,
     note = excluded.note,
     ai_done = excluded.ai_done,
     ai_correct = excluded.ai_correct,
@@ -258,7 +272,7 @@ const UPSERT_SUBMISSION_SQL = `
 export function upsertSubmission(input: {
   userId: string;
   homeworkId: string;
-  imagePath: string;
+  imagePaths: string[];
   note?: string | null;
   aiDone?: boolean | null;
   aiCorrect?: boolean | null;
@@ -266,11 +280,15 @@ export function upsertSubmission(input: {
   aiError?: string | null;
   aiEvaluatedAt?: string | null;
 }): void {
+  if (input.imagePaths.length < 1 || input.imagePaths.length > 3) {
+    throw new Error("Expected 1–3 photos");
+  }
   stmt(UPSERT_SUBMISSION_SQL).run(
     newId(),
     input.userId,
     input.homeworkId,
-    input.imagePath,
+    input.imagePaths[0],
+    JSON.stringify(input.imagePaths),
     input.note ?? null,
     input.aiDone == null ? null : input.aiDone ? 1 : 0,
     input.aiCorrect == null ? null : input.aiCorrect ? 1 : 0,
@@ -278,6 +296,30 @@ export function upsertSubmission(input: {
     input.aiError ?? null,
     input.aiEvaluatedAt ?? null,
   );
+}
+
+// Commit the evidence and its completion decision together, only if no parent
+// changed the status while evaluation was in flight (including done → undone).
+export function commitSubmission(
+  input: Parameters<typeof upsertSubmission>[0],
+  expectedVersion: number,
+): boolean {
+  const db = getDb();
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    const item = getHomeworkById(input.homeworkId);
+    if (!item || item.done_at || item.completion_version !== expectedVersion) {
+      db.exec("ROLLBACK");
+      return false;
+    }
+    upsertSubmission(input);
+    if (input.aiDone) markHomeworkDone(input.homeworkId, input.userId, "ai");
+    db.exec("COMMIT");
+    return true;
+  } catch (error) {
+    db.exec("ROLLBACK");
+    throw error;
+  }
 }
 
 export function getSubmission(userId: string, homeworkId: string): SubmissionWithUser | undefined {

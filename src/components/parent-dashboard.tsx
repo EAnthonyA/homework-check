@@ -1,12 +1,13 @@
 "use client";
 
-import type { CSSProperties } from "react";
+import { useState, type CSSProperties } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { Check, History, Loader2 } from "lucide-react";
 import { formatDateHuman, vilniusDateString } from "@/lib/timezone";
 import { Header } from "./header";
-import { AiVerdict } from "./ai-verdict";
+import { SubmissionEvidence } from "./submission-evidence";
+import { HomeworkSections } from "./homework-sections";
 import type { SessionProp, TodayResponse } from "./types";
 
 function shortDue(dateStr: string): string {
@@ -21,6 +22,7 @@ function shortDue(dateStr: string): string {
 
 export function ParentDashboard({ session }: { session: SessionProp }) {
   const queryClient = useQueryClient();
+  const [notice, setNotice] = useState("");
 
   const markDone = useMutation({
     mutationFn: async (homeworkId: string) => {
@@ -31,7 +33,8 @@ export function ParentDashboard({ session }: { session: SessionProp }) {
       }
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
+      setNotice(result.calendarFailed ? "Darbas pažymėtas atliktu, bet nepavyko pašalinti jo iš kalendoriaus." : "Darbas perkeltas į istoriją. Ten gali jį grąžinti taisyti.");
       queryClient.invalidateQueries({ queryKey: ["homework", "today"] });
       queryClient.invalidateQueries({ queryKey: ["homework", "history"] });
     },
@@ -57,10 +60,10 @@ export function ParentDashboard({ session }: { session: SessionProp }) {
           <div>
             <p className="font-hand text-[1.35rem] leading-none text-pen-deep">{todayHuman}</p>
             <h1 className="font-display mt-2 text-[2rem] font-black leading-[1.05] tracking-tight text-ink">
-              Šiandienos namų darbai
+              Namų darbai
             </h1>
             <p className="mt-2.5 max-w-[38ch] text-[0.9375rem] leading-relaxed text-ink-soft">
-              Ką vaikai turi padaryti šiandien.
+              Kas dar liko atlikti ir ką vaikai jau pateikė.
             </p>
           </div>
           <Link
@@ -72,6 +75,8 @@ export function ParentDashboard({ session }: { session: SessionProp }) {
             <History className="h-5 w-5" />
           </Link>
         </div>
+        {notice && <p role="status" className="mt-4 text-sm text-ink">{notice}</p>}
+        {markDone.error && <p role="alert" className="mt-3 text-sm text-pen-deep">Nepavyko pažymėti darbo. Bandyk dar kartą.</p>}
       </section>
 
       <div className="mt-7 flex flex-col gap-5 px-5">
@@ -82,11 +87,10 @@ export function ParentDashboard({ session }: { session: SessionProp }) {
         {data && data.items.length === 0 && (
           <div className="sheet anim-rise p-8 pl-10">
             <p className="font-hand text-3xl leading-none text-leaf-deep">Laisvadienis!</p>
-            <p className="mt-2 text-ink-soft">Šiandien namų darbų nėra.</p>
+            <p className="mt-2 text-ink-soft">Neatliktų namų darbų nėra.</p>
           </div>
         )}
-        {data?.items.map((item, i) => {
-          const done = item.submissions.length > 0;
+        {data && <HomeworkSections items={data.items} today={data.date}>{(item, i) => {
           return (
             <article
               key={item.id}
@@ -95,9 +99,9 @@ export function ParentDashboard({ session }: { session: SessionProp }) {
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <h2 className="font-display text-[1.35rem] font-bold leading-snug text-ink">
+                  <h3 className="font-display text-[1.35rem] font-bold leading-snug text-ink">
                     {item.subject}
-                  </h2>
+                  </h3>
                   <p className="mt-1 whitespace-pre-wrap text-[0.9375rem] leading-relaxed text-ink-soft">
                     {item.description}
                   </p>
@@ -105,32 +109,15 @@ export function ParentDashboard({ session }: { session: SessionProp }) {
                     Atlikti iki {shortDue(item.dueDate)}
                   </p>
                 </div>
-                {done ? (
-                  <span className="font-hand shrink-0 text-2xl leading-none text-leaf-deep">Atlikta ✓</span>
-                ) : (
-                  <span className="font-hand shrink-0 text-2xl leading-none text-honey-deep">Laukia ✎</span>
-                )}
+                <span className="font-hand shrink-0 text-xl leading-none text-honey-deep">Neatlikta ✎</span>
               </div>
 
               {item.submissions.length > 0 && (
                 <div className="mt-4 flex flex-col gap-3 border-t border-dashed border-rule pt-4">
                   {item.submissions.map((s) => (
-                    <div key={s.userId} className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
-                      <a
-                        href={s.imagePath}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-2 rounded-full border border-rule bg-paper px-3 py-1 text-[0.8125rem] font-medium text-ink transition-colors hover:border-pen/40"
-                      >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={s.imagePath}
-                          alt={s.userName}
-                          className="h-5 w-5 rounded-full object-cover"
-                        />
-                        {s.userName} · pateikė
-                      </a>
-                      <AiVerdict submission={s} compact />
+                    <div key={s.userId}>
+                      <SubmissionEvidence submission={s} />
+                      {s.aiDone && <p className="mt-2 text-sm text-pen-deep">Darbas grąžintas taisyti. Rodomas ankstesnis AI vertinimas.</p>}
                     </div>
                   ))}
                 </div>
@@ -158,7 +145,7 @@ export function ParentDashboard({ session }: { session: SessionProp }) {
               </div>
             </article>
           );
-        })}
+        }}</HomeworkSections>}
       </div>
     </main>
   );

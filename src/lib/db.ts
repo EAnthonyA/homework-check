@@ -46,6 +46,8 @@ function migrate(database: DatabaseSync): void {
   add("ai_summary", "ai_summary TEXT");
   add("ai_error", "ai_error TEXT");
   add("ai_evaluated_at", "ai_evaluated_at TEXT");
+  add("image_paths", "image_paths TEXT");
+  database.exec("UPDATE submissions SET image_paths = json_array(image_path) WHERE image_paths IS NULL");
 
   const homework = database.prepare("PRAGMA table_info(homework_items)").all() as Array<{
     name: string;
@@ -58,5 +60,11 @@ function migrate(database: DatabaseSync): void {
   }
   if (!homework.some((c) => c.name === "done_by")) {
     database.exec("ALTER TABLE homework_items ADD COLUMN done_by TEXT");
+  }
+  if (!homework.some((c) => c.name === "done_source")) {
+    database.exec("ALTER TABLE homework_items ADD COLUMN done_source TEXT");
+  }
+  if (!homework.some((c) => c.name === "completion_version")) {
+    database.exec("ALTER TABLE homework_items ADD COLUMN completion_version INTEGER NOT NULL DEFAULT 0");
   }
 }

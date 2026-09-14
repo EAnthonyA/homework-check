@@ -27,6 +27,8 @@ CREATE TABLE IF NOT EXISTS homework_items (
   assigned_date TEXT,
   done_at TEXT,
   done_by TEXT,
+  done_source TEXT,
+  completion_version INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 );
@@ -36,6 +38,7 @@ CREATE TABLE IF NOT EXISTS submissions (
   user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   homework_id TEXT NOT NULL REFERENCES homework_items(id) ON DELETE CASCADE,
   image_path TEXT NOT NULL,
+  image_paths TEXT,
   note TEXT,
   ai_done INTEGER,
   ai_correct INTEGER,

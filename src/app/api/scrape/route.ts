@@ -2,8 +2,7 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { runScrape } from "@/lib/scraper/run";
 import { syncAllUsers } from "@/lib/calendar";
-import { listHomeworkFrom, getLatestScrapeRun } from "@/lib/repo";
-import { vilniusDateString } from "@/lib/timezone";
+import { listUnfinishedHomework, getLatestScrapeRun } from "@/lib/repo";
 
 export async function GET() {
   const session = await getSession();
@@ -20,7 +19,7 @@ export async function POST() {
 
   try {
     const result = await runScrape();
-    const sync = await syncAllUsers(listHomeworkFrom(vilniusDateString()));
+    const sync = await syncAllUsers(listUnfinishedHomework());
     return NextResponse.json({
       ok: true,
       itemsAdded: result.itemsAdded,
