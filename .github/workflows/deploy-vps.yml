@@ -19,7 +19,7 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
-            mkdir -p ~/homework-check ~/lazyfood/nginx/conf.d
+            mkdir -p ~/homework-check ~/lazyfood/nginx/conf.d/certs
 
       - name: Sync app secrets to VPS .env
         uses: appleboy/ssh-action@v1
@@ -93,13 +93,22 @@ jobs:
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+          PAVILNYS_ORIGIN_CERT_B64: ${{ secrets.PAVILNYS_ORIGIN_CERT_B64 }}
+          PAVILNYS_ORIGIN_KEY_B64: ${{ secrets.PAVILNYS_ORIGIN_KEY_B64 }}
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          envs: DOCKERHUB_USERNAME,DOCKERHUB_TOKEN
+          envs: DOCKERHUB_USERNAME,DOCKERHUB_TOKEN,PAVILNYS_ORIGIN_CERT_B64,PAVILNYS_ORIGIN_KEY_B64
           script: |
             set -e
+
+            test -n "$PAVILNYS_ORIGIN_CERT_B64"
+            test -n "$PAVILNYS_ORIGIN_KEY_B64"
+            umask 077
+            printf '%s' "$PAVILNYS_ORIGIN_CERT_B64" | base64 -d > ~/lazyfood/nginx/conf.d/certs/pavilnys5b.lt.pem
+            printf '%s' "$PAVILNYS_ORIGIN_KEY_B64" | base64 -d > ~/lazyfood/nginx/conf.d/certs/pavilnys5b.lt.key
+            chmod 600 ~/lazyfood/nginx/conf.d/certs/pavilnys5b.lt.key
 
             cd ~/homework-check
 
@@ -117,17 +126,18 @@ jobs:
             DOCKERHUB_USERNAME=$DOCKERHUB_USERNAME IMAGE_TAG=latest \
             docker compose -f docker-compose.prod.yml up -d --remove-orphans
 
-            # Reload lazy-food nginx so the new pavilnys5b.lt vhost takes effect
+            # Validate and reload the shared proxy after installing the certificate.
+            docker exec lazyfood-nginx-prod nginx -t
             docker exec lazyfood-nginx-prod nginx -s reload
 
             # Clean up dangling images to save disk space
             docker image prune -f
 
-            # Quick health check - query the app from inside its own container
-            # (no host port is published; nginx is the only public entry point).
+            # Check the app and its local HTTPS route through the shared proxy.
             echo "Waiting for app health check..."
             for i in $(seq 1 12); do
-              if docker exec homework-check-prod node -e "fetch('http://localhost:3000/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"; then
+              if docker exec homework-check-prod node -e "fetch('http://localhost:3000/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))" \
+                && curl -kfsS --max-time 5 --resolve pavilnys5b.lt:443:127.0.0.1 https://pavilnys5b.lt/ > /dev/null; then
                 echo "App is healthy."
                 exit 0
               fi
