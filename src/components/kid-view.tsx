@@ -60,7 +60,9 @@ export function KidView({ session }: { session: SessionProp }) {
               </p>
               {mine && <div className="mt-4 border-t border-dashed border-rule pt-4">
                 <SubmissionEvidence submission={mine} />
-                {mine.aiDone && <p className="mt-2 text-sm text-pen-deep">Darbas grąžintas taisyti. Ankstesnis AI vertinimas jo neužbaigia.</p>}
+                {mine.aiDone && mine.aiCorrect === false && (
+                  <p className="mt-2 text-sm text-pen-deep">AI rado klaidų. Pataisyk pagal komentarą ir pateik iš naujo.</p>
+                )}
               </div>}
               <PhotoSubmission homeworkId={item.id} replacing={Boolean(mine)} onResult={setNotice} />
             </article>

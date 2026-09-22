@@ -12,9 +12,9 @@ type Verdict =
 const styles = {
   error: { text: "text-slate", mark: "mark-slate", label: "Neįvertinta" },
   notDone: { text: "text-pen-deep", mark: "mark-pen", label: "Neatlikta" },
-  wrong: { text: "text-honey-deep", mark: "mark-honey", label: "Yra klaidų" },
+  wrong: { text: "text-honey-deep", mark: "mark-honey", label: "Reikia pataisyti" },
   right: { text: "text-leaf-deep", mark: "mark-leaf", label: "Atlikta ir teisinga" },
-  done: { text: "text-leaf-deep", mark: "mark-leaf", label: "Atlikta" },
+  done: { text: "text-slate", mark: "mark-slate", label: "Reikia peržiūros" },
 } as const;
 
 function resolveVerdict(submission: SubmissionView): Verdict {
