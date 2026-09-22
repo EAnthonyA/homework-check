@@ -313,7 +313,12 @@ export function commitSubmission(
       return false;
     }
     upsertSubmission(input);
-    if (input.aiDone) markHomeworkDone(input.homeworkId, input.userId, "ai");
+    // A photographed solution is complete only when AI can confirm both that
+    // the whole task is present and that it is correct. A partial or incorrect
+    // solution remains active so the child can read the feedback and retry.
+    if (input.aiDone && input.aiCorrect === true) {
+      markHomeworkDone(input.homeworkId, input.userId, "ai");
+    }
     db.exec("COMMIT");
     return true;
   } catch (error) {

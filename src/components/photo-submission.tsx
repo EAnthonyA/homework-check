@@ -38,13 +38,15 @@ export function PhotoSubmission({ homeworkId, replacing, onResult }: {
       const response = await fetch("/api/upload", { method: "POST", body: form });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body.error ?? "Nepavyko pateikti. Bandyk dar kartą.");
-      return body as { completed: boolean; calendarFailed: number };
+      return body as { completed: boolean; calendarFailed: number; ai: { done: boolean; correct: boolean | null } | null };
     },
     onSuccess: (result) => {
       clearPhotos();
       onResult(result.completed
-        ? `AI pažymėjo darbą kaip atliktą. Nuotraukos išsaugotos istorijoje.${result.calendarFailed ? " Nepavyko atnaujinti kalendoriaus — pranešk tėvams." : ""}`
-        : "Nuotraukos išsaugotos. Peržiūrėk vertinimą prie užduoties.");
+        ? `AI patvirtino, kad darbas atliktas teisingai. Nuotraukos išsaugotos istorijoje.${result.calendarFailed ? " Nepavyko atnaujinti kalendoriaus — pranešk tėvams." : ""}`
+        : result.ai?.done && result.ai.correct === false
+          ? "AI rado klaidų. Perskaityk komentarą prie užduoties, pataisyk ir pateik iš naujo."
+          : "Nuotraukos išsaugotos. Peržiūrėk vertinimą prie užduoties.");
       queryClient.invalidateQueries({ queryKey: ["homework"] });
     },
     onError: (cause) => setError(cause.message),

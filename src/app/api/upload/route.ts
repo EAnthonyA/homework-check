@@ -79,9 +79,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Darbo būsena pasikeitė vertinant. Atnaujink puslapį prieš pateikdamas dar kartą." }, { status: 409 });
     }
 
-    // AI-approved homework is complete for the whole family: archive it and
-    // remove its calendar events.
-    const completed = ai?.done === true;
+    // AI approval requires a complete *and* correct solution. Incorrect or
+    // unverifiable work stays active with its photos and feedback for a retry.
+    const completed = ai?.done === true && ai.correct === true;
     let calendarFailed = 0;
     if (completed) {
       try {

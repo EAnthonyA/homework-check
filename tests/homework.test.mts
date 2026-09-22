@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { after, test, mock } from "node:test";
-import { mkdtempSync, readdirSync, rmSync } from "node:fs";
+import { mkdtempSync, readdirSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
@@ -29,7 +29,7 @@ const repo = await import("../src/lib/repo");
 const { getDb } = await import("../src/lib/db");
 const { submissionView } = await import("../src/lib/submission-view");
 const { validatePhotos, MAX_PHOTO_BYTES } = await import("../src/lib/upload-rules");
-const { saveUpload, discardUnsavedUploads } = await import("../src/lib/uploads");
+const { saveUpload, discardUnsavedUploads, purgeExpiredUploads, uploadDir } = await import("../src/lib/uploads");
 const { evaluateHomeworkImages } = await import("../src/lib/ai");
 const { syncAllUsers, removeHomeworkFromCalendars } = await import("../src/lib/calendar");
 const { encrypt } = await import("../src/lib/crypto");
@@ -50,7 +50,7 @@ test("legacy photo migrates once, keeping unknown completion source neutral", ()
   assert.equal(repo.getSubmission("kid", "legacy")!.image_paths, '["/api/uploads/old.jpg"]');
 });
 
-test("latest complete photo set and AI verdict replace the previous attempt atomically", () => {
+test("an incorrect AI verdict keeps the latest photo set active for correction", () => {
   const item = homework("replace");
   const first = { userId: "kid", homeworkId: item.id, imagePaths: ["/a.jpg"], aiDone: false };
   assert.equal(repo.commitSubmission(first, 0), true);
@@ -60,13 +60,23 @@ test("latest complete photo set and AI verdict replace the previous attempt atom
   assert.equal(saved.imagePath, "/b.jpg");
   assert.equal(saved.aiCorrect, false);
   assert.equal(repo.listSubmissionsForHomework(item.id).length, 1);
+  assert.equal(repo.getHomeworkById(item.id)!.done_source, null);
+  assert.equal(repo.getHomeworkById(item.id)!.done_at, null);
+  assert.ok(!repo.listHomeworkHistory().some((entry) => entry.id === item.id));
+});
+
+test("only a complete and correct AI verdict completes homework", () => {
+  const item = homework("correct");
+  assert.equal(repo.commitSubmission({
+    userId: "kid", homeworkId: item.id, imagePaths: ["/correct.jpg"], aiDone: true, aiCorrect: true,
+  }, 0), true);
   assert.equal(repo.getHomeworkById(item.id)!.done_source, "ai");
   assert.ok(repo.listHomeworkHistory().some((entry) => entry.id === item.id));
 });
 
 test("undo preserves evidence, restores overdue visibility, and is idempotent", () => {
   const item = homework("undo");
-  repo.commitSubmission({ userId: "kid", homeworkId: item.id, imagePaths: ["/proof.jpg"], aiDone: true }, 0);
+  repo.commitSubmission({ userId: "kid", homeworkId: item.id, imagePaths: ["/proof.jpg"], aiDone: true, aiCorrect: true }, 0);
   repo.markHomeworkDone(item.id, "parent");
   assert.equal(repo.getHomeworkById(item.id)!.done_source, "ai");
   repo.reopenHomework(item.id);
@@ -83,7 +93,7 @@ test("undo preserves evidence, restores overdue visibility, and is idempotent", 
 
 test("an in-flight AI result cannot overwrite parent completion or a complete/reopen cycle", () => {
   const item = homework("race");
-  const input = { userId: "kid", homeworkId: item.id, imagePaths: ["/stale.jpg"], aiDone: true };
+  const input = { userId: "kid", homeworkId: item.id, imagePaths: ["/stale.jpg"], aiDone: true, aiCorrect: true };
   repo.markHomeworkDone(item.id, "parent");
   assert.equal(repo.commitSubmission(input, 0), false);
   assert.equal(repo.getHomeworkById(item.id)!.done_source, "parent");
@@ -114,6 +124,17 @@ test("photo rules accept 1–3 files and reject invalid sets before saving", asy
   assert.equal(readdirSync(process.env.UPLOAD_DIR!).length, 1);
   discardUnsavedUploads([saved.imagePath]);
   assert.equal(readdirSync(process.env.UPLOAD_DIR!).length, 0);
+});
+
+test("expired uploads are removed after three days while recent uploads remain", () => {
+  const oldName = "00000000-0000-0000-0000-000000000001.jpg";
+  const recentName = "00000000-0000-0000-0000-000000000002.jpg";
+  writeFileSync(path.join(uploadDir(), oldName), "old");
+  writeFileSync(path.join(uploadDir(), recentName), "recent");
+  const now = Date.now();
+  utimesSync(path.join(uploadDir(), oldName), new Date(now - 4 * 24 * 60 * 60 * 1_000), new Date(now - 4 * 24 * 60 * 60 * 1_000));
+  assert.equal(purgeExpiredUploads(now), 1);
+  assert.deepEqual(readdirSync(uploadDir()), [recentName]);
 });
 
 test("Gemini receives all pages in one request and returns one combined verdict", async (t) => {

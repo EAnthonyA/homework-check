@@ -6,7 +6,7 @@ A small family app that keeps track of homework:
 - **Parses** homework items by date.
 - **Publishes** each item as an all-day event on every family member's own Google Calendar.
 - **Shows** unfinished homework, including overdue work, to parents and kids.
-- **Lets the kid submit 1–3 photos** together for one Gemini verdict (done? correct?). AI approval or a parent's action marks the homework complete.
+- **Lets the kid submit 1–3 photos** together for one Gemini verdict (done? correct?). Only an AI verdict that it is both done and correct, or a parent's action, marks the homework complete.
 - **Keeps completion history** with the latest photos per kid, AI verdicts, and completion source. Parents can reopen work, preserving its evidence and restoring calendar events.
 
 ## Tech stack
@@ -26,10 +26,12 @@ A small family app that keeps track of homework:
 3. Kids select or photograph 1–3 pages (up to 10 MB each), preview them, and submit
    all pages for one evaluation. The latest submission replaces the previous one
    for that kid and homework. Files live on local disk behind authenticated URLs.
-4. When `GEMINI_API_KEY` is set, Gemini evaluates all pages together. `done: true`
-   completes the work, even if the verdict reports mistakes. Without AI, or if
-   evaluation fails, the photos remain available for parent review and the work
-   stays unfinished.
+4. When `GEMINI_API_KEY` is set, Gemini evaluates all pages together. Only
+   `done: true` together with `correct: true` completes the work. If it finds
+   mistakes, the child sees the feedback beside the active homework and can
+   correct and submit it again. Without AI, or if evaluation fails or cannot
+   verify correctness, the photos remain available for parent review and the
+   work stays unfinished.
 5. Parents see photos and verdicts in both active work and completion history.
    Reopening work clears its completion, keeps its evidence, and restores its
    original calendar dates. Overdue work reappears in both active views.
@@ -61,6 +63,7 @@ pnpm dev               # http://localhost:3000
 | `ALLOWED_EMAILS` | Comma-separated emails allowed to sign in. Empty = anyone can sign in. `PARENT_EMAILS` are always allowed. |
 | `SCRAPE_CRON` | Cron expression (Europe/Vilnius). Default `0 15 * * *`. |
 | `UPLOAD_DIR` | Directory for uploaded images (`./data/uploads` locally). |
+| `UPLOAD_RETENTION_DAYS` | How long uploaded images are kept; defaults to `3`. Homework records and AI feedback remain. |
 | `APP_URL` | Optional public origin override (defaults to the request origin). |
 | `SCRAPER_DEBUG` | `1` to dump the authenticated homework HTML to `./data/debug`. |
 | `GEMINI_API_KEY` | Google AI Studio API key. When set, all photos in a submission are sent together to Gemini to judge whether the task is done and correct. Empty = save photos without AI evaluation. |

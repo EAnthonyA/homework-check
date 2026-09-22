@@ -28,7 +28,7 @@ export async function GET(_req: Request, ctx: RouteContext<"/api/uploads/[name]"
     return new Response(new Uint8Array(data), {
       headers: {
         "content-type": MIME[ext] ?? "application/octet-stream",
-        "cache-control": "private, max-age=31536000, immutable",
+        "cache-control": "private, no-store",
       },
     });
   } catch {

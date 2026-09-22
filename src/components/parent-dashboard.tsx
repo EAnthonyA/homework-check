@@ -117,7 +117,9 @@ export function ParentDashboard({ session }: { session: SessionProp }) {
                   {item.submissions.map((s) => (
                     <div key={s.userId}>
                       <SubmissionEvidence submission={s} />
-                      {s.aiDone && <p className="mt-2 text-sm text-pen-deep">Darbas grąžintas taisyti. Rodomas ankstesnis AI vertinimas.</p>}
+                      {s.aiDone && s.aiCorrect === false && (
+                        <p className="mt-2 text-sm text-pen-deep">AI rado klaidų — vaikas turi pataisyti ir pateikti iš naujo.</p>
+                      )}
                     </div>
                   ))}
                 </div>
