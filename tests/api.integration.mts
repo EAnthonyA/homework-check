@@ -86,7 +86,9 @@ test("authenticated upload, history and undo against the production server", { t
     assert.equal(result.completed, false);
     assert.equal(result.ai, null);
     assert.equal((await request(result.imagePath)).status, 401);
-    assert.equal((await request(result.imagePath, parent)).status, 200);
+    const uploadedImage = await request(result.imagePath, parent);
+    assert.equal(uploadedImage.status, 200);
+    assert.equal(uploadedImage.headers.get("cache-control"), "private, no-store");
     for (const body of [photos(0), photos(4), photos(2, true)]) {
       assert.equal((await request("/api/upload", kid, { method: "POST", body })).status, 400);
     }
