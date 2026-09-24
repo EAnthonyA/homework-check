@@ -7,7 +7,7 @@ import { DatabaseSync } from "node:sqlite";
 import { execFileSync } from "node:child_process";
 import { google } from "googleapis";
 import { SCHEMA_SQL } from "../src/lib/schema";
-import { parseAssessments } from "../src/lib/scraper/assessments";
+import { assessmentDataRowCount, parseAssessments } from "../src/lib/scraper/assessments";
 
 const directory = mkdtempSync(path.join(tmpdir(), "homework-unit-"));
 process.env.DB_PATH = path.join(directory, "test.db");
@@ -52,11 +52,12 @@ test("legacy photo migrates once, keeping unknown completion source neutral", ()
 });
 
 test("assessment parser preserves the source's date, type, group, topic and entered date", () => {
-  const items = parseAssessments(`
+  const html = `
     <table><tr><th>Eil. Nr.</th><th>Data</th><th>Atsiskaitomojo darbo tipas</th><th>Grupė</th><th>Atsiskaitomojo darbo tema</th><th>Įvesta</th></tr>
     <tr><td>1</td><td>2026-10-01</td><td>Kontrolinis darbas</td><td>Matematika (-) 5b</td><td>Natūralieji skaičiai</td><td>2026-09-11</td></tr>
-    </table>
-  `);
+    </table>`;
+  const items = parseAssessments(html);
+  assert.equal(assessmentDataRowCount(html), 1);
   assert.deepEqual(items, [{
     assessmentDate: "2026-10-01",
     assessmentType: "Kontrolinis darbas",
@@ -64,6 +65,15 @@ test("assessment parser preserves the source's date, type, group, topic and ente
     topic: "Natūralieji skaičiai",
     enteredDate: "2026-09-11",
   }]);
+});
+
+test("assessment parser identifies nonempty rows that it cannot safely reconcile", () => {
+  const html = `
+    <table><tr><th>Eil. Nr.</th><th>Data</th><th>Atsiskaitomojo darbo tipas</th><th>Grupė</th><th>Atsiskaitomojo darbo tema</th><th>Įvesta</th></tr>
+    <tr><td>1</td><td>nenurodyta</td><td>Kontrolinis darbas</td><td>Matematika (-) 5b</td><td>Natūralieji skaičiai</td><td>2026-09-11</td></tr>
+    </table>`;
+  assert.equal(assessmentDataRowCount(html), 1);
+  assert.deepEqual(parseAssessments(html), []);
 });
 
 test("assessment reconciliation retires removed rows and retains upcoming rows", () => {

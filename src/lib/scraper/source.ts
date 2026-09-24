@@ -170,6 +170,10 @@ export function fetchHomeworkPage(jar: CookieJar): Promise<string> {
   return fetchPage(jar, "HOMEWORK_SOURCE_HOMEWORK_PAGE", "Homework");
 }
 
+export function isAssessmentsPageConfigured(): boolean {
+  return Boolean(env("HOMEWORK_SOURCE_ASSESSMENTS_PAGE"));
+}
+
 export function fetchAssessmentsPage(jar: CookieJar): Promise<string> {
   return fetchPage(jar, "HOMEWORK_SOURCE_ASSESSMENTS_PAGE", "Assessments");
 }

@@ -32,6 +32,22 @@ export function hasAssessmentsTable(html: string): boolean {
   );
 }
 
+// A genuine empty schedule has no multi-cell data rows. If such rows do exist
+// but parsing produces fewer entries, retain the last known schedule instead
+// of accidentally retiring it after an upstream markup change.
+export function assessmentDataRowCount(html: string): number {
+  const $ = cheerio.load(html);
+  let count = 0;
+  $("table").each((_, table) => {
+    const headers = $(table).find("tr").first().find("th").map((__, th) => cleanText($(th))).get();
+    if (!headers.some((header) => /atsiskaitomojo darbo tipas/i.test(header))) return;
+    $(table).find("tr").slice(1).each((__, row) => {
+      if ($(row).find("td").length > 1) count += 1;
+    });
+  });
+  return count;
+}
+
 export function parseAssessments(html: string): ParsedAssessmentItem[] {
   const $ = cheerio.load(html);
   const items: ParsedAssessmentItem[] = [];
