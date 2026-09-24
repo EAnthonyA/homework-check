@@ -41,6 +41,19 @@ export interface HomeworkHistoryRow extends HomeworkRow {
   done_by_name: string | null;
 }
 
+export interface AssessmentRow {
+  id: string;
+  source_id: string;
+  assessment_date: string;
+  assessment_type: string;
+  group_name: string;
+  topic: string;
+  entered_date: string | null;
+  active: number;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface SubmissionWithUser {
   id: string;
   user_id: string;
@@ -250,6 +263,85 @@ export function listHomeworkHistory(): HomeworkHistoryRow[] {
   `).all() as unknown as HomeworkHistoryRow[];
 }
 
+// ---------- Assessments ----------
+
+export function getAssessmentById(id: string): AssessmentRow | undefined {
+  return stmt("SELECT * FROM assessment_items WHERE id = ?").get(id) as AssessmentRow | undefined;
+}
+
+export function getAssessmentBySourceId(sourceId: string): AssessmentRow | undefined {
+  return stmt("SELECT * FROM assessment_items WHERE source_id = ?").get(sourceId) as AssessmentRow | undefined;
+}
+
+const INSERT_ASSESSMENT_SQL = `
+  INSERT INTO assessment_items (
+    id, source_id, assessment_date, assessment_type, group_name, topic, entered_date, active
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, 1)
+`;
+const UPDATE_ASSESSMENT_SQL = `
+  UPDATE assessment_items
+  SET assessment_date = ?, assessment_type = ?, group_name = ?, topic = ?, entered_date = ?, active = 1,
+      updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
+  WHERE id = ?
+`;
+
+export function upsertAssessmentItem(input: {
+  sourceId: string;
+  assessmentDate: string;
+  assessmentType: string;
+  groupName: string;
+  topic: string;
+  enteredDate?: string | null;
+}): { item: AssessmentRow; created: boolean; changed: boolean } {
+  const existing = getAssessmentBySourceId(input.sourceId);
+  if (existing) {
+    const changed =
+      existing.assessment_date !== input.assessmentDate ||
+      existing.assessment_type !== input.assessmentType ||
+      existing.group_name !== input.groupName ||
+      existing.topic !== input.topic ||
+      (existing.entered_date ?? null) !== (input.enteredDate ?? null) ||
+      existing.active !== 1;
+    if (changed) {
+      stmt(UPDATE_ASSESSMENT_SQL).run(
+        input.assessmentDate,
+        input.assessmentType,
+        input.groupName,
+        input.topic,
+        input.enteredDate ?? null,
+        existing.id,
+      );
+      return { item: getAssessmentBySourceId(input.sourceId)!, created: false, changed: true };
+    }
+    return { item: existing, created: false, changed: false };
+  }
+  stmt(INSERT_ASSESSMENT_SQL).run(
+    newId(),
+    input.sourceId,
+    input.assessmentDate,
+    input.assessmentType,
+    input.groupName,
+    input.topic,
+    input.enteredDate ?? null,
+  );
+  return { item: getAssessmentBySourceId(input.sourceId)!, created: true, changed: false };
+}
+
+// The source does not expose a stable assessment ID. A full successful scrape
+// therefore reconciles its visible schedule: missing rows are retired, while a
+// rescheduled row is imported as the new date.
+export function deactivateAssessments(): void {
+  stmt(
+    "UPDATE assessment_items SET active = 0, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE active = 1",
+  ).run();
+}
+
+export function listUpcomingAssessments(date: string): AssessmentRow[] {
+  return stmt(
+    "SELECT * FROM assessment_items WHERE active = 1 AND assessment_date >= ? ORDER BY assessment_date ASC, group_name ASC",
+  ).all(date) as unknown as AssessmentRow[];
+}
+
 // ---------- Submissions ----------
 
 const UPSERT_SUBMISSION_SQL = `
@@ -369,6 +461,39 @@ export function upsertCalendarEvent(userId: string, homeworkId: string, googleEv
 
 export function deleteCalendarEvent(userId: string, homeworkId: string): void {
   stmt("DELETE FROM calendar_events WHERE user_id = ? AND homework_id = ?").run(userId, homeworkId);
+}
+
+export function getAssessmentCalendarEvent(
+  userId: string,
+  assessmentId: string,
+): { id: string; google_event_id: string } | undefined {
+  return stmt("SELECT * FROM assessment_calendar_events WHERE user_id = ? AND assessment_id = ?").get(userId, assessmentId) as
+    | { id: string; google_event_id: string }
+    | undefined;
+}
+
+const UPSERT_ASSESSMENT_CALENDAR_EVENT_SQL = `
+  INSERT INTO assessment_calendar_events (id, user_id, assessment_id, google_event_id)
+  VALUES (?, ?, ?, ?)
+  ON CONFLICT(user_id, assessment_id) DO UPDATE SET
+    google_event_id = excluded.google_event_id,
+    synced_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
+`;
+export function upsertAssessmentCalendarEvent(userId: string, assessmentId: string, googleEventId: string): void {
+  stmt(UPSERT_ASSESSMENT_CALENDAR_EVENT_SQL).run(newId(), userId, assessmentId, googleEventId);
+}
+
+export function deleteAssessmentCalendarEvent(userId: string, assessmentId: string): void {
+  stmt("DELETE FROM assessment_calendar_events WHERE user_id = ? AND assessment_id = ?").run(userId, assessmentId);
+}
+
+export function listRetiredAssessmentCalendarEvents(userId: string): Array<{ assessment_id: string; google_event_id: string }> {
+  return stmt(`
+    SELECT e.assessment_id, e.google_event_id
+    FROM assessment_calendar_events e
+    JOIN assessment_items a ON a.id = e.assessment_id
+    WHERE e.user_id = ? AND a.active = 0
+  `).all(userId) as unknown as Array<{ assessment_id: string; google_event_id: string }>;
 }
 
 // ---------- Scrape runs ----------

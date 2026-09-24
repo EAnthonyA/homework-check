@@ -10,6 +10,12 @@ import {
   getCalendarEvent,
   upsertCalendarEvent,
   deleteCalendarEvent,
+  getAssessmentCalendarEvent,
+  getAssessmentById,
+  upsertAssessmentCalendarEvent,
+  deleteAssessmentCalendarEvent,
+  listRetiredAssessmentCalendarEvents,
+  type AssessmentRow,
   type HomeworkRow,
 } from "./repo";
 
@@ -135,6 +141,100 @@ export async function syncAllUsers(items: HomeworkRow[]): Promise<{ created: num
   let failed = 0;
   for (const user of listUsers()) {
     const result = await syncCalendarForUser(user.id, items);
+    created += result.created;
+    failed += result.failed;
+  }
+  return { created, failed };
+}
+
+export async function syncAssessmentsForUser(
+  userId: string,
+  assessments: AssessmentRow[],
+): Promise<{ created: number; failed: number }> {
+  return withCalendarLock(userId, async () => {
+    const user = getUserById(userId);
+    if (!user || !user.calendar_enabled || !user.encrypted_refresh_token) return { created: 0, failed: 0 };
+
+    let calendar;
+    try {
+      calendar = google.calendar({ version: "v3", auth: oauthForUser(user.encrypted_refresh_token) });
+    } catch (error) {
+      console.error(`[calendar] could not authenticate user=${userId}:`, error);
+      return { created: 0, failed: assessments.length };
+    }
+
+    let created = 0;
+    let failed = 0;
+    for (const requested of assessments) {
+      const assessment = getAssessmentById(requested.id);
+      if (!assessment || !assessment.active) continue;
+      const requestBody = {
+        summary: `${assessment.assessment_type}: ${assessment.group_name}`,
+        description: assessment.topic,
+        start: { date: assessment.assessment_date },
+        end: { date: addDays(assessment.assessment_date, 1) },
+      };
+      try {
+        const existing = getAssessmentCalendarEvent(userId, assessment.id);
+        if (existing) {
+          try {
+            const current = await calendar.events.get({ calendarId: "primary", eventId: existing.google_event_id });
+            const event = current.data;
+            if (event.status === "cancelled") throw Object.assign(new Error("Event was deleted"), { code: 410 });
+            if (
+              event.start?.date !== requestBody.start.date ||
+              event.end?.date !== requestBody.end.date ||
+              event.summary !== requestBody.summary ||
+              event.description !== requestBody.description
+            ) {
+              await calendar.events.patch({ calendarId: "primary", eventId: existing.google_event_id, requestBody });
+            }
+          } catch (error) {
+            if (![404, 410].includes((error as { code?: number }).code ?? 0)) throw error;
+            deleteAssessmentCalendarEvent(userId, assessment.id);
+            const inserted = await calendar.events.insert({ calendarId: "primary", requestBody });
+            if (inserted.data.id) {
+              upsertAssessmentCalendarEvent(userId, assessment.id, inserted.data.id);
+              created += 1;
+            }
+          }
+        } else {
+          const inserted = await calendar.events.insert({ calendarId: "primary", requestBody });
+          if (inserted.data.id) {
+            upsertAssessmentCalendarEvent(userId, assessment.id, inserted.data.id);
+            created += 1;
+          }
+        }
+      } catch (error) {
+        failed += 1;
+        console.error(`[calendar] failed to sync assessment for user=${userId} item=${assessment.id}:`, error);
+      }
+    }
+
+    for (const retired of listRetiredAssessmentCalendarEvents(userId)) {
+      try {
+        await calendar.events.delete({ calendarId: "primary", eventId: retired.google_event_id });
+        deleteAssessmentCalendarEvent(userId, retired.assessment_id);
+      } catch (error) {
+        const code = (error as { code?: number }).code;
+        if (code === 404 || code === 410) deleteAssessmentCalendarEvent(userId, retired.assessment_id);
+        else {
+          failed += 1;
+          console.error(`[calendar] failed to remove retired assessment for user=${userId}:`, error);
+        }
+      }
+    }
+    return { created, failed };
+  });
+}
+
+export async function syncAssessmentsForAllUsers(
+  assessments: AssessmentRow[],
+): Promise<{ created: number; failed: number }> {
+  let created = 0;
+  let failed = 0;
+  for (const user of listUsers()) {
+    const result = await syncAssessmentsForUser(user.id, assessments);
     created += result.created;
     failed += result.failed;
   }

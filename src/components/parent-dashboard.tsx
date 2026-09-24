@@ -8,6 +8,8 @@ import { formatDateHuman, vilniusDateString } from "@/lib/timezone";
 import { Header } from "./header";
 import { SubmissionEvidence } from "./submission-evidence";
 import { HomeworkSections } from "./homework-sections";
+import { AssessmentPreview } from "./assessment-preview";
+import { DashboardTabs, SwipeableDashboardPanels, type DashboardTab } from "./dashboard-tabs";
 import type { SessionProp, TodayResponse } from "./types";
 
 function shortDue(dateStr: string): string {
@@ -23,6 +25,7 @@ function shortDue(dateStr: string): string {
 export function ParentDashboard({ session }: { session: SessionProp }) {
   const queryClient = useQueryClient();
   const [notice, setNotice] = useState("");
+  const [activeTab, setActiveTab] = useState<DashboardTab>("homework");
 
   const markDone = useMutation({
     mutationFn: async (homeworkId: string) => {
@@ -79,7 +82,16 @@ export function ParentDashboard({ session }: { session: SessionProp }) {
         {markDone.error && <p role="alert" className="mt-3 text-sm text-pen-deep">Nepavyko pažymėti darbo. Bandyk dar kartą.</p>}
       </section>
 
-      <div className="mt-7 flex flex-col gap-5 px-5">
+      <div className="mt-7 px-5">
+        <DashboardTabs active={activeTab} onChange={setActiveTab} panelId="parent-dashboard" />
+        <SwipeableDashboardPanels active={activeTab} onChange={setActiveTab}>
+        <div
+          id="parent-dashboard-homework-panel"
+          role="tabpanel"
+          aria-labelledby="parent-dashboard-homework-tab"
+          hidden={activeTab !== "homework"}
+          className="mt-5 flex flex-col gap-5"
+        >
         {isLoading && <p className="py-10 text-center text-ink-faint">Kraunama…</p>}
         {error && (
           <p className="font-hand text-2xl text-pen-deep">✗ Įvyko klaida — atnaujink puslapį.</p>
@@ -148,6 +160,17 @@ export function ParentDashboard({ session }: { session: SessionProp }) {
             </article>
           );
         }}</HomeworkSections>}
+        </div>
+        <div
+          id="parent-dashboard-assessments-panel"
+          role="tabpanel"
+          aria-labelledby="parent-dashboard-assessments-tab"
+          hidden={activeTab !== "assessments"}
+          className="mt-5"
+        >
+          <AssessmentPreview audience="parent" />
+        </div>
+        </SwipeableDashboardPanels>
       </div>
     </main>
   );

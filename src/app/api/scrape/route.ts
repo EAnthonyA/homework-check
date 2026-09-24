@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { runScrape } from "@/lib/scraper/run";
-import { syncAllUsers } from "@/lib/calendar";
-import { listUnfinishedHomework, getLatestScrapeRun } from "@/lib/repo";
+import { syncAllUsers, syncAssessmentsForAllUsers } from "@/lib/calendar";
+import { listUnfinishedHomework, listUpcomingAssessments, getLatestScrapeRun } from "@/lib/repo";
+import { vilniusDateString } from "@/lib/timezone";
 
 export async function GET() {
   const session = await getSession();
@@ -19,12 +20,17 @@ export async function POST() {
 
   try {
     const result = await runScrape();
-    const sync = await syncAllUsers(listUnfinishedHomework());
+    const [homeworkSync, assessmentSync] = await Promise.all([
+      syncAllUsers(listUnfinishedHomework()),
+      syncAssessmentsForAllUsers(listUpcomingAssessments(vilniusDateString())),
+    ]);
     return NextResponse.json({
       ok: true,
       itemsAdded: result.itemsAdded,
       itemsChanged: result.itemsChanged,
-      calendarCreated: sync.created,
+      assessmentsAdded: result.assessmentsAdded,
+      assessmentsChanged: result.assessmentsChanged,
+      calendarCreated: homeworkSync.created + assessmentSync.created,
     });
   } catch (err) {
     return NextResponse.json(
