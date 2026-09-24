@@ -67,4 +67,9 @@ function migrate(database: DatabaseSync): void {
   if (!homework.some((c) => c.name === "completion_version")) {
     database.exec("ALTER TABLE homework_items ADD COLUMN completion_version INTEGER NOT NULL DEFAULT 0");
   }
+
+  const assessments = database.prepare("PRAGMA table_info(assessment_items)").all() as Array<{ name: string }>;
+  if (assessments.length > 0 && !assessments.some((c) => c.name === "active")) {
+    database.exec("ALTER TABLE assessment_items ADD COLUMN active INTEGER NOT NULL DEFAULT 1");
+  }
 }

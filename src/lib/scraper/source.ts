@@ -151,15 +151,25 @@ export async function login(jar: CookieJar): Promise<void> {
   jar.update(follow);
 }
 
-export async function fetchHomeworkPage(jar: CookieJar): Promise<string> {
-  const url = endpoint(env("HOMEWORK_SOURCE_HOMEWORK_PAGE"));
+async function fetchPage(jar: CookieJar, pathName: string, label: string): Promise<string> {
+  const path = env(pathName);
+  if (!path) throw new HomeworkSourceError(`${pathName} is not set`);
+  const url = endpoint(path);
   const res = await fetch(url, {
     headers: { ...navHeaders("same-origin"), cookie: jar.header() },
     redirect: "manual",
   });
   jar.update(res);
   if (res.status >= 400) {
-    throw new HomeworkSourceError(`Homework page returned HTTP ${res.status}`);
+    throw new HomeworkSourceError(`${label} page returned HTTP ${res.status}`);
   }
   return res.text();
+}
+
+export function fetchHomeworkPage(jar: CookieJar): Promise<string> {
+  return fetchPage(jar, "HOMEWORK_SOURCE_HOMEWORK_PAGE", "Homework");
+}
+
+export function fetchAssessmentsPage(jar: CookieJar): Promise<string> {
+  return fetchPage(jar, "HOMEWORK_SOURCE_ASSESSMENTS_PAGE", "Assessments");
 }

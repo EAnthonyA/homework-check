@@ -7,6 +7,7 @@ import { DatabaseSync } from "node:sqlite";
 import { execFileSync } from "node:child_process";
 import { google } from "googleapis";
 import { SCHEMA_SQL } from "../src/lib/schema";
+import { parseAssessments } from "../src/lib/scraper/assessments";
 
 const directory = mkdtempSync(path.join(tmpdir(), "homework-unit-"));
 process.env.DB_PATH = path.join(directory, "test.db");
@@ -48,6 +49,47 @@ test("legacy photo migrates once, keeping unknown completion source neutral", ()
   assert.equal(repo.getHomeworkById("legacy")!.done_source, null);
   execFileSync(process.execPath, ["--import", "tsx", "-e", "require('./src/lib/db.ts').getDb().close()"], { env: process.env });
   assert.equal(repo.getSubmission("kid", "legacy")!.image_paths, '["/api/uploads/old.jpg"]');
+});
+
+test("assessment parser preserves the source's date, type, group, topic and entered date", () => {
+  const items = parseAssessments(`
+    <table><tr><th>Eil. Nr.</th><th>Data</th><th>Atsiskaitomojo darbo tipas</th><th>Grupė</th><th>Atsiskaitomojo darbo tema</th><th>Įvesta</th></tr>
+    <tr><td>1</td><td>2026-10-01</td><td>Kontrolinis darbas</td><td>Matematika (-) 5b</td><td>Natūralieji skaičiai</td><td>2026-09-11</td></tr>
+    </table>
+  `);
+  assert.deepEqual(items, [{
+    assessmentDate: "2026-10-01",
+    assessmentType: "Kontrolinis darbas",
+    groupName: "Matematika (-) 5b",
+    topic: "Natūralieji skaičiai",
+    enteredDate: "2026-09-11",
+  }]);
+});
+
+test("assessment reconciliation retires removed rows and retains upcoming rows", () => {
+  const active = repo.upsertAssessmentItem({
+    sourceId: "assessment-active",
+    assessmentDate: "2099-01-02",
+    assessmentType: "Kontrolinis darbas",
+    groupName: "Matematika 5b",
+    topic: "Skaičiai",
+  }).item;
+  repo.upsertAssessmentItem({
+    sourceId: "assessment-retired",
+    assessmentDate: "2099-01-03",
+    assessmentType: "Testas",
+    groupName: "Lietuvių kalba 5b",
+    topic: "Skaitymas",
+  });
+  repo.deactivateAssessments();
+  repo.upsertAssessmentItem({
+    sourceId: active.source_id,
+    assessmentDate: active.assessment_date,
+    assessmentType: active.assessment_type,
+    groupName: active.group_name,
+    topic: active.topic,
+  });
+  assert.deepEqual(repo.listUpcomingAssessments("2099-01-01").map((item) => item.source_id), ["assessment-active"]);
 });
 
 test("an incorrect AI verdict keeps the latest photo set active for correction", () => {

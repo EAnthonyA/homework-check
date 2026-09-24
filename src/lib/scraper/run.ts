@@ -3,15 +3,27 @@ import { createHash } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { CookieJar } from "./cookie-jar";
-import { login, fetchHomeworkPage } from "./source";
+import { login, fetchAssessmentsPage, fetchHomeworkPage } from "./source";
 import { parseHomework } from "./parse";
-import { createScrapeRun, finishScrapeRun, upsertHomeworkItem, type HomeworkRow } from "../repo";
+import { hasAssessmentsTable, parseAssessments } from "./assessments";
+import {
+  createScrapeRun,
+  deactivateAssessments,
+  finishScrapeRun,
+  upsertAssessmentItem,
+  upsertHomeworkItem,
+  type AssessmentRow,
+  type HomeworkRow,
+} from "../repo";
 import { sanitizeFreeText } from "../sanitize";
 
 export interface ScrapeResult {
   itemsAdded: number;
   itemsChanged: number;
   items: HomeworkRow[];
+  assessmentsAdded: number;
+  assessmentsChanged: number;
+  assessments: AssessmentRow[];
 }
 
 function dumpHtml(html: string): void {
@@ -28,11 +40,15 @@ export async function runScrape(): Promise<ScrapeResult> {
   let itemsAdded = 0;
   let itemsChanged = 0;
   const items: HomeworkRow[] = [];
+  let assessmentsAdded = 0;
+  let assessmentsChanged = 0;
+  const assessments: AssessmentRow[] = [];
 
   try {
     const jar = new CookieJar();
     await login(jar);
     const html = await fetchHomeworkPage(jar);
+    const assessmentsHtml = await fetchAssessmentsPage(jar);
     dumpHtml(html);
 
     const parsed = parseHomework(html);
@@ -58,8 +74,38 @@ export async function runScrape(): Promise<ScrapeResult> {
       else if (result.changed) itemsChanged += 1;
     }
 
-    finishScrapeRun(runId, { status: "success", itemsAdded, itemsChanged });
-    return { itemsAdded, itemsChanged, items };
+    const parsedAssessments = parseAssessments(assessmentsHtml);
+    if (!hasAssessmentsTable(assessmentsHtml)) {
+      throw new Error("No assessments table found — keep existing assessments and tune src/lib/scraper/assessments.ts");
+    }
+    deactivateAssessments();
+    for (const assessment of parsedAssessments) {
+      // A dated row is the only identifier exposed by the source. Including
+      // every visible field lets a moved or edited assessment replace the old
+      // active row during this reconciliation pass.
+      const sourceId = createHash("sha256")
+        .update(`${assessment.assessmentDate}|${assessment.assessmentType}|${assessment.groupName}|${assessment.topic}`)
+        .digest("hex")
+        .slice(0, 32);
+      const result = upsertAssessmentItem({
+        sourceId,
+        assessmentDate: assessment.assessmentDate,
+        assessmentType: sanitizeFreeText(assessment.assessmentType, 200),
+        groupName: sanitizeFreeText(assessment.groupName, 200),
+        topic: sanitizeFreeText(assessment.topic, 2000),
+        enteredDate: assessment.enteredDate,
+      });
+      assessments.push(result.item);
+      if (result.created) assessmentsAdded += 1;
+      else if (result.changed) assessmentsChanged += 1;
+    }
+
+    finishScrapeRun(runId, {
+      status: "success",
+      itemsAdded: itemsAdded + assessmentsAdded,
+      itemsChanged: itemsChanged + assessmentsChanged,
+    });
+    return { itemsAdded, itemsChanged, items, assessmentsAdded, assessmentsChanged, assessments };
   } catch (err) {
     finishScrapeRun(runId, {
       status: "error",

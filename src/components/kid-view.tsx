@@ -7,10 +7,13 @@ import { Header } from "./header";
 import { SubmissionEvidence } from "./submission-evidence";
 import { PhotoSubmission } from "./photo-submission";
 import { HomeworkSections } from "./homework-sections";
+import { AssessmentPreview } from "./assessment-preview";
+import { DashboardTabs, SwipeableDashboardPanels, type DashboardTab } from "./dashboard-tabs";
 import type { SessionProp, TodayResponse } from "./types";
 
 export function KidView({ session }: { session: SessionProp }) {
   const [notice, setNotice] = useState("");
+  const [activeTab, setActiveTab] = useState<DashboardTab>("homework");
   const { data, isLoading, error } = useQuery<TodayResponse>({
     queryKey: ["homework", "today"],
     queryFn: async () => {
@@ -31,7 +34,16 @@ export function KidView({ session }: { session: SessionProp }) {
         </p>
         {notice && <p role="status" className="mt-4 text-sm text-ink">{notice}</p>}
       </section>
-      <div className="mt-7 flex flex-col gap-5 px-5">
+      <div className="mt-7 px-5">
+        <DashboardTabs active={activeTab} onChange={setActiveTab} panelId="kid-dashboard" />
+        <SwipeableDashboardPanels active={activeTab} onChange={setActiveTab}>
+        <div
+          id="kid-dashboard-homework-panel"
+          role="tabpanel"
+          aria-labelledby="kid-dashboard-homework-tab"
+          hidden={activeTab !== "homework"}
+          className="mt-5 flex flex-col gap-5"
+        >
         {isLoading && [0, 1].map((i) => (
           <div key={i} className="sheet p-5 pl-10" aria-label="Kraunama">
             <div className="skeleton h-6 w-32" /><div className="skeleton mt-3 h-4 w-full" />
@@ -68,6 +80,17 @@ export function KidView({ session }: { session: SessionProp }) {
             </article>
           );
         }}</HomeworkSections>}
+        </div>
+        <div
+          id="kid-dashboard-assessments-panel"
+          role="tabpanel"
+          aria-labelledby="kid-dashboard-assessments-tab"
+          hidden={activeTab !== "assessments"}
+          className="mt-5"
+        >
+          <AssessmentPreview audience="kid" />
+        </div>
+        </SwipeableDashboardPanels>
       </div>
     </main>
   );

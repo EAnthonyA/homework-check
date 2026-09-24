@@ -52,3 +52,17 @@ export interface HistoryItemView {
 export interface HistoryResponse {
   items: HistoryItemView[];
 }
+
+export interface AssessmentItemView {
+  id: string;
+  date: string;
+  type: string;
+  group: string;
+  topic: string;
+  enteredDate: string | null;
+}
+
+export interface AssessmentsResponse {
+  date: string;
+  items: AssessmentItemView[];
+}
