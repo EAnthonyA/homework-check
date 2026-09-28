@@ -6,7 +6,12 @@ import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { execFileSync } from "node:child_process";
 import { SCHEMA_SQL } from "../src/lib/schema";
-import { assessmentDataRowCount, canReconcileAssessmentSchedule, parseAssessments } from "../src/lib/scraper/assessments";
+import {
+  assessmentDataRowCount,
+  assessmentPagePathFromHomework,
+  canReconcileAssessmentSchedule,
+  parseAssessments,
+} from "../src/lib/scraper/assessments";
 import { parseMessageDetail, parseMessageList, shouldImportMessage } from "../src/lib/scraper/messages";
 import { assessmentsPagePath } from "../src/lib/scraper/source";
 
@@ -72,6 +77,14 @@ test("assessment parser identifies nonempty rows that it cannot safely reconcile
     </table>`;
   assert.equal(assessmentDataRowCount(html), 1);
   assert.deepEqual(parseAssessments(html), []);
+});
+
+test("assessment route is read from the source homework navigation", () => {
+  assert.equal(
+    assessmentPagePathFromHomework('<a href="/7/lt/page/control_work/dates_pupil">Atsiskaitymai</a>'),
+    "/7/lt/page/control_work/dates_pupil",
+  );
+  assert.equal(assessmentPagePathFromHomework("<a href='/unrelated'>Kita</a>"), null);
 });
 
 test("assessment page has a stable default, while allowing an environment override", () => {

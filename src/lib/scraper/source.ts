@@ -194,8 +194,8 @@ export function assessmentsPagePath(): string {
   return configuredPath || DEFAULT_ASSESSMENTS_PAGE;
 }
 
-export function fetchAssessmentsPage(jar: CookieJar): Promise<string> {
-  return fetchPage(jar, "HOMEWORK_SOURCE_ASSESSMENTS_PAGE", "Assessments", assessmentsPagePath());
+export function fetchAssessmentsPage(jar: CookieJar, pagePath = assessmentsPagePath()): Promise<string> {
+  return fetchPath(jar, pagePath, "Assessments");
 }
 
 export function messagesPagePath(): string {

@@ -9,6 +9,17 @@ export interface ParsedAssessmentItem {
   enteredDate?: string;
 }
 
+/**
+ * The source renders the currently valid assessments route in the homework
+ * navigation. Prefer it over a configured fallback because the route can vary
+ * between source deployments.
+ */
+export function assessmentPagePathFromHomework(html: string): string | null {
+  const $ = cheerio.load(html);
+  const href = $("a[href*='/page/control_work/dates_pupil']").first().attr("href")?.trim();
+  return href?.startsWith("/") ? href : null;
+}
+
 function pad(n: number): string {
   return String(n).padStart(2, "0");
 }

@@ -5,7 +5,13 @@ import path from "node:path";
 import { CookieJar } from "./cookie-jar";
 import { assessmentsPagePath, fetchAssessmentsPage, fetchHomeworkPage, fetchMessageDetail, fetchMessagesPage, login } from "./source";
 import { parseHomework } from "./parse";
-import { assessmentDataRowCount, canReconcileAssessmentSchedule, hasAssessmentsTable, parseAssessments } from "./assessments";
+import {
+  assessmentDataRowCount,
+  assessmentPagePathFromHomework,
+  canReconcileAssessmentSchedule,
+  hasAssessmentsTable,
+  parseAssessments,
+} from "./assessments";
 import { parseMessageDetail, parseMessageList, shouldImportMessage } from "./messages";
 import {
   createScrapeRun,
@@ -83,9 +89,13 @@ export async function runScrape(): Promise<ScrapeResult> {
       listedMessages = null;
     }
     let assessmentsHtml: string | null = null;
-    log(`fetching assessments page at ${assessmentsPagePath()}`);
+    const linkedAssessmentsPath = assessmentPagePathFromHomework(html);
+    const assessmentPath = linkedAssessmentsPath ?? assessmentsPagePath();
+    log(
+      `fetching assessments page at ${assessmentPath}${linkedAssessmentsPath ? " (from source navigation)" : " (fallback)"}`,
+    );
     try {
-      assessmentsHtml = await fetchAssessmentsPage(jar);
+      assessmentsHtml = await fetchAssessmentsPage(jar, assessmentPath);
       log(`assessments page received (${assessmentsHtml.length} bytes)`);
     } catch (error) {
       // Assessment availability must never stop the established homework sync.
