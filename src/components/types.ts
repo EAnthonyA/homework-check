@@ -66,3 +66,22 @@ export interface AssessmentsResponse {
   date: string;
   items: AssessmentItemView[];
 }
+
+export interface MessageAttachmentView {
+  id: string;
+  name: string;
+  href: string;
+}
+
+export interface MessageItemView {
+  id: string;
+  sender: string;
+  subject: string;
+  body: string;
+  receivedAt: string;
+  attachments: MessageAttachmentView[];
+}
+
+export interface MessagesResponse {
+  items: MessageItemView[];
+}

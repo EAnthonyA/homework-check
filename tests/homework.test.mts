@@ -7,7 +7,9 @@ import { DatabaseSync } from "node:sqlite";
 import { execFileSync } from "node:child_process";
 import { google } from "googleapis";
 import { SCHEMA_SQL } from "../src/lib/schema";
-import { assessmentDataRowCount, parseAssessments } from "../src/lib/scraper/assessments";
+import { assessmentDataRowCount, canReconcileAssessmentSchedule, parseAssessments } from "../src/lib/scraper/assessments";
+import { parseMessageDetail, parseMessageList } from "../src/lib/scraper/messages";
+import { assessmentsPagePath } from "../src/lib/scraper/source";
 
 const directory = mkdtempSync(path.join(tmpdir(), "homework-unit-"));
 process.env.DB_PATH = path.join(directory, "test.db");
@@ -74,6 +76,69 @@ test("assessment parser identifies nonempty rows that it cannot safely reconcile
     </table>`;
   assert.equal(assessmentDataRowCount(html), 1);
   assert.deepEqual(parseAssessments(html), []);
+});
+
+test("assessment page has a stable default, while allowing an environment override", () => {
+  const previous = process.env.HOMEWORK_SOURCE_ASSESSMENTS_PAGE;
+  delete process.env.HOMEWORK_SOURCE_ASSESSMENTS_PAGE;
+  assert.equal(assessmentsPagePath(), "/l/lt/page/control_work/dates_pupil");
+  process.env.HOMEWORK_SOURCE_ASSESSMENTS_PAGE = "/custom-assessments";
+  assert.equal(assessmentsPagePath(), "/custom-assessments");
+  if (previous === undefined) delete process.env.HOMEWORK_SOURCE_ASSESSMENTS_PAGE;
+  else process.env.HOMEWORK_SOURCE_ASSESSMENTS_PAGE = previous;
+});
+
+test("an unavailable or empty assessment schedule cannot retire existing upcoming assessments", () => {
+  assert.equal(canReconcileAssessmentSchedule(0, 0, true), false);
+  assert.equal(canReconcileAssessmentSchedule(0, 1, true), false);
+  assert.equal(canReconcileAssessmentSchedule(1, 1, true), true);
+  assert.equal(canReconcileAssessmentSchedule(0, 0, false), true);
+});
+
+test("message parser reads full content, attachment paths, unread state, and pagination", () => {
+  const list = parseMessageList(`
+    <table class="messageListTable">
+      <tr data-url="/1/lt/page/message_new/message/42" class="unreadMessageEnvelope"><td /></tr>
+      <tr data-url="/1/lt/page/message_new/message/43" class="readMessageEnvelope"><td /></tr>
+    </table>
+    <a class="pag-next" href="/1/lt/page/message_new/message_list/date_desc/2">Kitas</a>
+  `);
+  assert.deepEqual(list, {
+    items: [{ sourceId: "42", unread: true }, { sourceId: "43", unread: false }],
+    nextPagePath: "/1/lt/page/message_new/message_list/date_desc/2",
+  });
+
+  const detail = parseMessageDetail(`
+    <h3 class="subTitle">Svarbus pranešimas</h3>
+    <div id="messageContainer-42">
+      <span class="messageInboxSenderLabel">Mokytoja <div>Administracija</div></span>
+      <span class="messageInboxDateLabel">2026-09-28 16:30:00</span>
+      <div class="messageText"><p>Visa žinutė.</p><p>Antra eilutė.</p></div>
+      <div class="messageFilesContainer"><a href="/1/lt/action/lostandfound/download_file/12/token" title="tvarkaraštis.pdf">Failas</a></div>
+    </div>
+  `, "42");
+  assert.deepEqual(detail, {
+    sender: "Mokytoja Administracija",
+    subject: "Svarbus pranešimas",
+    body: "Visa žinutė. Antra eilutė.",
+    receivedAt: "2026-09-28 16:30:00",
+    attachments: [{ name: "tvarkaraštis.pdf", sourcePath: "/1/lt/action/lostandfound/download_file/12/token" }],
+  });
+});
+
+test("messages and their attachment metadata are retained locally", () => {
+  const created = repo.upsertMessageItem({
+    sourceId: "source-message", sender: "Mokytoja", subject: "Tema", body: "Žinutė", receivedAt: "2026-09-28 16:30:00",
+    attachments: [{ name: "failas.pdf", sourcePath: "/1/lt/action/lostandfound/download_file/1/token" }],
+  });
+  assert.equal(created.created, true);
+  const saved = repo.listMessages().find((item) => item.id === created.item.id)!;
+  assert.equal(saved.body, "Žinutė");
+  assert.equal(repo.listMessageAttachments(saved.id)[0]?.name, "failas.pdf");
+  assert.ok(repo.listUnreadMessages("kid").some((item) => item.id === saved.id));
+  repo.markMessageRead("kid", saved.id);
+  assert.ok(!repo.listUnreadMessages("kid").some((item) => item.id === saved.id));
+  assert.ok(repo.listUnreadMessages("parent").some((item) => item.id === saved.id));
 });
 
 test("assessment reconciliation retires removed rows and retains upcoming rows", () => {

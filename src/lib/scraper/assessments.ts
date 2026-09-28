@@ -48,6 +48,17 @@ export function assessmentDataRowCount(html: string): number {
   return count;
 }
 
+// Do not retire a previously imported upcoming schedule when the source
+// unexpectedly responds with an empty table. A later successful scrape can
+// still reconcile a genuinely empty schedule once there is nothing upcoming.
+export function canReconcileAssessmentSchedule(
+  parsedCount: number,
+  dataRowCount: number,
+  hasExistingUpcomingAssessments: boolean,
+): boolean {
+  return parsedCount >= dataRowCount && (parsedCount > 0 || !hasExistingUpcomingAssessments);
+}
+
 export function parseAssessments(html: string): ParsedAssessmentItem[] {
   const $ = cheerio.load(html);
   const items: ParsedAssessmentItem[] = [];

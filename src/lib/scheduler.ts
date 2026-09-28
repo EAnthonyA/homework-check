@@ -42,6 +42,7 @@ export function startScheduler(): void {
         console.log(
           `[scheduler] scrape done (+${result.itemsAdded} items, ~${result.itemsChanged} changed); ` +
             `assessments +${result.assessmentsAdded}, ~${result.assessmentsChanged} changed; ` +
+            `messages +${result.messagesAdded}, ~${result.messagesChanged} changed; ` +
             `calendar: +${homeworkSync.created + assessmentSync.created} events`,
         );
       } catch (err) {

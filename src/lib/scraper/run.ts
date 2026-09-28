@@ -3,19 +3,23 @@ import { createHash } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { CookieJar } from "./cookie-jar";
-import { login, fetchAssessmentsPage, fetchHomeworkPage, isAssessmentsPageConfigured } from "./source";
+import { fetchAssessmentsPage, fetchHomeworkPage, fetchMessageDetail, fetchMessagesPage, login } from "./source";
 import { parseHomework } from "./parse";
-import { assessmentDataRowCount, hasAssessmentsTable, parseAssessments } from "./assessments";
+import { assessmentDataRowCount, canReconcileAssessmentSchedule, hasAssessmentsTable, parseAssessments } from "./assessments";
+import { parseMessageDetail, parseMessageList } from "./messages";
 import {
   createScrapeRun,
   deactivateAssessments,
   finishScrapeRun,
+  listUpcomingAssessments,
   upsertAssessmentItem,
   upsertHomeworkItem,
+  upsertMessageItem,
   type AssessmentRow,
   type HomeworkRow,
 } from "../repo";
 import { sanitizeFreeText } from "../sanitize";
+import { vilniusDateString } from "../timezone";
 
 export interface ScrapeResult {
   itemsAdded: number;
@@ -24,6 +28,8 @@ export interface ScrapeResult {
   assessmentsAdded: number;
   assessmentsChanged: number;
   assessments: AssessmentRow[];
+  messagesAdded: number;
+  messagesChanged: number;
 }
 
 function dumpHtml(html: string): void {
@@ -43,19 +49,33 @@ export async function runScrape(): Promise<ScrapeResult> {
   let assessmentsAdded = 0;
   let assessmentsChanged = 0;
   const assessments: AssessmentRow[] = [];
+  let messagesAdded = 0;
+  let messagesChanged = 0;
 
   try {
     const jar = new CookieJar();
     await login(jar);
     const html = await fetchHomeworkPage(jar);
+    let listedMessages: Array<{ sourceId: string; unread: boolean }> | null = [];
+    try {
+      let messagesPagePath: string | undefined;
+      do {
+        const messagesHtml = await fetchMessagesPage(jar, messagesPagePath);
+        const page = parseMessageList(messagesHtml);
+        listedMessages.push(...page.items);
+        messagesPagePath = page.nextPagePath;
+      } while (messagesPagePath);
+    } catch (error) {
+      // Message availability must never prevent the established homework sync.
+      console.error("[scraper] messages page could not be fetched; keeping local messages:", error);
+      listedMessages = null;
+    }
     let assessmentsHtml: string | null = null;
-    if (isAssessmentsPageConfigured()) {
-      try {
-        assessmentsHtml = await fetchAssessmentsPage(jar);
-      } catch (error) {
-        // Assessment availability must never stop the established homework sync.
-        console.error("[scraper] assessments page could not be fetched; keeping the last known schedule:", error);
-      }
+    try {
+      assessmentsHtml = await fetchAssessmentsPage(jar);
+    } catch (error) {
+      // Assessment availability must never stop the established homework sync.
+      console.error("[scraper] assessments page could not be fetched; keeping the last known schedule:", error);
     }
     dumpHtml(html);
 
@@ -82,14 +102,49 @@ export async function runScrape(): Promise<ScrapeResult> {
       else if (result.changed) itemsChanged += 1;
     }
 
+    if (listedMessages) {
+      const seenMessageIds = new Set<string>();
+      for (const listed of listedMessages) {
+        if (seenMessageIds.has(listed.sourceId)) continue;
+        seenMessageIds.add(listed.sourceId);
+        try {
+          const detail = parseMessageDetail(await fetchMessageDetail(jar, listed.sourceId), listed.sourceId);
+          if (!detail) throw new Error("message detail could not be parsed");
+          const result = upsertMessageItem({
+            sourceId: listed.sourceId,
+            sender: sanitizeFreeText(detail.sender, 200),
+            subject: sanitizeFreeText(detail.subject, 500),
+            body: sanitizeFreeText(detail.body, 10_000),
+            receivedAt: detail.receivedAt,
+            attachments: detail.attachments.map((attachment) => ({
+              name: sanitizeFreeText(attachment.name, 500),
+              sourcePath: attachment.sourcePath,
+            })),
+          });
+          if (result.created) messagesAdded += 1;
+          else if (result.changed) messagesChanged += 1;
+          // The source marks a message as read when its detail page is fetched.
+          // This happens only after its list entry was discovered and immediately
+          // before its complete content is written to our local inbox.
+        } catch (error) {
+          // Do not acknowledge a message whose local copy was not safely saved.
+          console.error(`[scraper] message ${listed.sourceId} could not be imported; keeping it unread at the source:`, error);
+        }
+      }
+    }
+
     if (assessmentsHtml) {
       const parsedAssessments = parseAssessments(assessmentsHtml);
       const dataRowCount = assessmentDataRowCount(assessmentsHtml);
       if (!hasAssessmentsTable(assessmentsHtml)) {
         throw new Error("No assessments table found — keep existing assessments and tune src/lib/scraper/assessments.ts");
       }
-      if (parsedAssessments.length < dataRowCount) {
-        throw new Error("Could not parse every assessment row — keep existing assessments and tune src/lib/scraper/assessments.ts");
+      if (!canReconcileAssessmentSchedule(
+        parsedAssessments.length,
+        dataRowCount,
+        listUpcomingAssessments(vilniusDateString()).length > 0,
+      )) {
+        throw new Error("Assessment schedule was incomplete or unexpectedly empty — keeping existing assessments");
       }
 
       deactivateAssessments();
@@ -117,10 +172,10 @@ export async function runScrape(): Promise<ScrapeResult> {
 
     finishScrapeRun(runId, {
       status: "success",
-      itemsAdded: itemsAdded + assessmentsAdded,
-      itemsChanged: itemsChanged + assessmentsChanged,
+      itemsAdded: itemsAdded + assessmentsAdded + messagesAdded,
+      itemsChanged: itemsChanged + assessmentsChanged + messagesChanged,
     });
-    return { itemsAdded, itemsChanged, items, assessmentsAdded, assessmentsChanged, assessments };
+    return { itemsAdded, itemsChanged, items, assessmentsAdded, assessmentsChanged, assessments, messagesAdded, messagesChanged };
   } catch (err) {
     finishScrapeRun(runId, {
       status: "error",

@@ -30,6 +30,8 @@ export async function POST() {
       itemsChanged: result.itemsChanged,
       assessmentsAdded: result.assessmentsAdded,
       assessmentsChanged: result.assessmentsChanged,
+      messagesAdded: result.messagesAdded,
+      messagesChanged: result.messagesChanged,
       calendarCreated: homeworkSync.created + assessmentSync.created,
     });
   } catch (err) {

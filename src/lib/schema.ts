@@ -80,6 +80,33 @@ CREATE TABLE IF NOT EXISTS assessment_calendar_events (
   UNIQUE(user_id, assessment_id)
 );
 
+CREATE TABLE IF NOT EXISTS message_items (
+  id TEXT PRIMARY KEY,
+  source_id TEXT UNIQUE NOT NULL,
+  sender TEXT NOT NULL,
+  subject TEXT NOT NULL,
+  body TEXT NOT NULL,
+  received_at TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+
+CREATE TABLE IF NOT EXISTS message_attachments (
+  id TEXT PRIMARY KEY,
+  message_id TEXT NOT NULL REFERENCES message_items(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  source_path TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  UNIQUE(message_id, source_path)
+);
+
+CREATE TABLE IF NOT EXISTS message_reads (
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  message_id TEXT NOT NULL REFERENCES message_items(id) ON DELETE CASCADE,
+  read_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  PRIMARY KEY (user_id, message_id)
+);
+
 CREATE TABLE IF NOT EXISTS scrape_runs (
   id TEXT PRIMARY KEY,
   started_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
@@ -95,4 +122,7 @@ CREATE INDEX IF NOT EXISTS idx_submissions_homework ON submissions(homework_id);
 CREATE INDEX IF NOT EXISTS idx_calendar_events_homework ON calendar_events(homework_id);
 CREATE INDEX IF NOT EXISTS idx_assessment_date ON assessment_items(assessment_date);
 CREATE INDEX IF NOT EXISTS idx_assessment_calendar_events_assessment ON assessment_calendar_events(assessment_id);
+CREATE INDEX IF NOT EXISTS idx_message_received_at ON message_items(received_at DESC);
+CREATE INDEX IF NOT EXISTS idx_message_attachments_message ON message_attachments(message_id);
+CREATE INDEX IF NOT EXISTS idx_message_reads_message ON message_reads(message_id);
 `;
