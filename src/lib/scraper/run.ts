@@ -44,6 +44,10 @@ function dumpHtml(html: string, page: "homework" | "assessments"): void {
 
 export async function runScrape(): Promise<ScrapeResult> {
   const runId = createScrapeRun();
+  const startedAt = Date.now();
+  const log = (message: string) => {
+    console.log(`[scraper][${runId}] +${Date.now() - startedAt}ms ${message}`);
+  };
   let itemsAdded = 0;
   let itemsChanged = 0;
   const items: HomeworkRow[] = [];
@@ -55,25 +59,34 @@ export async function runScrape(): Promise<ScrapeResult> {
 
   try {
     const jar = new CookieJar();
+    log("starting login");
     await login(jar);
+    log("login complete; fetching homework page");
     const html = await fetchHomeworkPage(jar);
+    log(`homework page received (${html.length} bytes); fetching messages`);
     let listedMessages: Array<{ sourceId: string; unread: boolean }> | null = [];
     try {
       let messagesPagePath: string | undefined;
+      let messagePageCount = 0;
       do {
         const messagesHtml = await fetchMessagesPage(jar, messagesPagePath);
         const page = parseMessageList(messagesHtml);
         listedMessages.push(...page.items);
         messagesPagePath = page.nextPagePath;
+        messagePageCount += 1;
+        log(`messages page ${messagePageCount} received (${page.items.length} listed)`);
       } while (messagesPagePath);
+      log(`${listedMessages.length} message(s) listed; fetching assessments page`);
     } catch (error) {
       // Message availability must never prevent the established homework sync.
       console.error("[scraper] messages page could not be fetched; keeping local messages:", error);
       listedMessages = null;
     }
     let assessmentsHtml: string | null = null;
+    log("fetching assessments page");
     try {
       assessmentsHtml = await fetchAssessmentsPage(jar);
+      log(`assessments page received (${assessmentsHtml.length} bytes)`);
     } catch (error) {
       // Assessment availability must never stop the established homework sync.
       console.error("[scraper] assessments page could not be fetched; keeping the last known schedule:", error);
@@ -85,6 +98,7 @@ export async function runScrape(): Promise<ScrapeResult> {
     if (parsed.length === 0) {
       throw new Error("No homework entries parsed — check SCRAPER_DEBUG HTML dump and tune src/lib/scraper/parse.ts");
     }
+    log(`${parsed.length} homework item(s) parsed; saving changes`);
 
     for (const p of parsed) {
       const sourceId = createHash("sha256")
@@ -103,6 +117,7 @@ export async function runScrape(): Promise<ScrapeResult> {
       if (result.created) itemsAdded += 1;
       else if (result.changed) itemsChanged += 1;
     }
+    log(`homework saved (+${itemsAdded}, ~${itemsChanged} changed)`);
 
     if (listedMessages) {
       const seenMessageIds = new Set<string>();
@@ -134,11 +149,17 @@ export async function runScrape(): Promise<ScrapeResult> {
           console.error(`[scraper] message ${listed.sourceId} could not be imported; keeping it unread at the source:`, error);
         }
       }
+      log(`messages saved (+${messagesAdded}, ~${messagesChanged} changed)`);
     }
 
-    if (assessmentsHtml && hasAssessmentsTable(assessmentsHtml)) {
+    const assessmentsTableFound = assessmentsHtml ? hasAssessmentsTable(assessmentsHtml) : false;
+    if (assessmentsHtml) {
+      log(`assessments table ${assessmentsTableFound ? "found" : "not found"}`);
+    }
+    if (assessmentsHtml && assessmentsTableFound) {
       const parsedAssessments = parseAssessments(assessmentsHtml);
       const dataRowCount = assessmentDataRowCount(assessmentsHtml);
+      log(`${dataRowCount} assessment row(s) found; ${parsedAssessments.length} parsed`);
       if (!canReconcileAssessmentSchedule(
         parsedAssessments.length,
         dataRowCount,
@@ -168,6 +189,7 @@ export async function runScrape(): Promise<ScrapeResult> {
         if (result.created) assessmentsAdded += 1;
         else if (result.changed) assessmentsChanged += 1;
       }
+      log(`assessments saved (+${assessmentsAdded}, ~${assessmentsChanged} changed)`);
     } else if (assessmentsHtml) {
       // The source can occasionally serve a page without the schedule table.
       // Keep the last known schedule and let homework/messages refresh normally.
@@ -179,6 +201,9 @@ export async function runScrape(): Promise<ScrapeResult> {
       itemsAdded: itemsAdded + assessmentsAdded + messagesAdded,
       itemsChanged: itemsChanged + assessmentsChanged + messagesChanged,
     });
+    log(
+      `complete: homework +${itemsAdded}/~${itemsChanged}, assessments +${assessmentsAdded}/~${assessmentsChanged}, messages +${messagesAdded}/~${messagesChanged}`,
+    );
     return { itemsAdded, itemsChanged, items, assessmentsAdded, assessmentsChanged, assessments, messagesAdded, messagesChanged };
   } catch (err) {
     finishScrapeRun(runId, {
@@ -187,6 +212,7 @@ export async function runScrape(): Promise<ScrapeResult> {
       itemsChanged,
       error: err instanceof Error ? err.message : String(err),
     });
+    log(`failed: ${err instanceof Error ? err.message : String(err)}`);
     throw err;
   }
 }

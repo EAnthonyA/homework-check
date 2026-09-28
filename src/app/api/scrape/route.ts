@@ -16,8 +16,11 @@ export async function POST() {
   if (!session) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   if (session.role !== "parent") return NextResponse.json({ error: "forbidden" }, { status: 403 });
 
+  const startedAt = Date.now();
+  console.log("[scrape API] manual refresh requested");
   try {
     const result = await runScrape();
+    console.log(`[scrape API] manual refresh complete in ${Date.now() - startedAt}ms`);
     return NextResponse.json({
       ok: true,
       itemsAdded: result.itemsAdded,
@@ -28,6 +31,7 @@ export async function POST() {
       messagesChanged: result.messagesChanged,
     });
   } catch (err) {
+    console.error(`[scrape API] manual refresh failed after ${Date.now() - startedAt}ms`);
     return NextResponse.json(
       { error: err instanceof Error ? err.message : String(err) },
       { status: 500 },
