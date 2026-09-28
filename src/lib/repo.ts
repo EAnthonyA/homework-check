@@ -83,8 +83,13 @@ export interface SubmissionWithUser {
   ai_done: number | null;
   ai_correct: number | null;
   ai_summary: string | null;
+  ai_good_parts: string | null;
+  ai_needs_work: string | null;
   ai_error: string | null;
   ai_evaluated_at: string | null;
+  learning_reason: string | null;
+  learning_question: string | null;
+  learning_guidance: string | null;
   created_at: string;
   user_name: string;
   user_role: Role;
@@ -448,9 +453,10 @@ export function upsertMessageItem(input: {
 const UPSERT_SUBMISSION_SQL = `
   INSERT INTO submissions (
     id, user_id, homework_id, image_path, image_paths, note,
-    ai_done, ai_correct, ai_summary, ai_error, ai_evaluated_at
+    ai_done, ai_correct, ai_summary, ai_good_parts, ai_needs_work, ai_error, ai_evaluated_at,
+    learning_reason, learning_question, learning_guidance
   )
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   ON CONFLICT(user_id, homework_id) DO UPDATE SET
     image_path = excluded.image_path,
     image_paths = excluded.image_paths,
@@ -458,8 +464,13 @@ const UPSERT_SUBMISSION_SQL = `
     ai_done = excluded.ai_done,
     ai_correct = excluded.ai_correct,
     ai_summary = excluded.ai_summary,
+    ai_good_parts = excluded.ai_good_parts,
+    ai_needs_work = excluded.ai_needs_work,
     ai_error = excluded.ai_error,
     ai_evaluated_at = excluded.ai_evaluated_at,
+    learning_reason = NULL,
+    learning_question = NULL,
+    learning_guidance = NULL,
     created_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
 `;
 export function upsertSubmission(input: {
@@ -470,6 +481,8 @@ export function upsertSubmission(input: {
   aiDone?: boolean | null;
   aiCorrect?: boolean | null;
   aiSummary?: string | null;
+  aiGoodParts?: string[];
+  aiNeedsWork?: string[];
   aiError?: string | null;
   aiEvaluatedAt?: string | null;
 }): void {
@@ -486,9 +499,28 @@ export function upsertSubmission(input: {
     input.aiDone == null ? null : input.aiDone ? 1 : 0,
     input.aiCorrect == null ? null : input.aiCorrect ? 1 : 0,
     input.aiSummary ?? null,
+    input.aiGoodParts ? JSON.stringify(input.aiGoodParts) : null,
+    input.aiNeedsWork ? JSON.stringify(input.aiNeedsWork) : null,
     input.aiError ?? null,
     input.aiEvaluatedAt ?? null,
+    null,
+    null,
+    null,
   );
+}
+
+export function saveLearningGuidance(input: {
+  userId: string;
+  homeworkId: string;
+  reason: "careless" | "did-not-understand" | "other";
+  question: string;
+  guidance: string;
+}): void {
+  stmt(`
+    UPDATE submissions
+    SET learning_reason = ?, learning_question = ?, learning_guidance = ?
+    WHERE user_id = ? AND homework_id = ?
+  `).run(input.reason, input.question, input.guidance, input.userId, input.homeworkId);
 }
 
 // Commit the evidence and its completion decision together, only if no parent

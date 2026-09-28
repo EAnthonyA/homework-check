@@ -17,8 +17,13 @@ export interface SubmissionView {
   aiDone: boolean | null;
   aiCorrect: boolean | null;
   aiSummary: string | null;
+  aiGoodParts: string[];
+  aiNeedsWork: string[];
   aiError: string | null;
   aiEvaluatedAt: string | null;
+  learningReason: string | null;
+  learningQuestion: string | null;
+  learningGuidance: string | null;
 }
 
 export interface HomeworkItemView {

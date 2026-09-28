@@ -43,8 +43,13 @@ CREATE TABLE IF NOT EXISTS submissions (
   ai_done INTEGER,
   ai_correct INTEGER,
   ai_summary TEXT,
+  ai_good_parts TEXT,
+  ai_needs_work TEXT,
   ai_error TEXT,
   ai_evaluated_at TEXT,
+  learning_reason TEXT,
+  learning_question TEXT,
+  learning_guidance TEXT,
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   UNIQUE(user_id, homework_id)
 );

@@ -62,6 +62,26 @@ export function AiVerdict({
       {submission.aiSummary && (
         <p className="font-hand mt-1.5 text-xl leading-snug text-ink-soft">{submission.aiSummary}</p>
       )}
+      {v.kind === "done" && v.correct === false && (submission.aiGoodParts.length > 0 || submission.aiNeedsWork.length > 0) && (
+        <div className="mt-3 grid gap-3 text-sm leading-relaxed sm:grid-cols-2">
+          {submission.aiGoodParts.length > 0 && (
+            <div>
+              <p className="font-semibold text-leaf-deep">Pavyko</p>
+              <ul className="mt-1 list-disc space-y-1 pl-4 text-ink-soft">
+                {submission.aiGoodParts.map((part) => <li key={part}>{part}</li>)}
+              </ul>
+            </div>
+          )}
+          {submission.aiNeedsWork.length > 0 && (
+            <div>
+              <p className="font-semibold text-honey-deep">Dar pasitikrink</p>
+              <ul className="mt-1 list-disc space-y-1 pl-4 text-ink-soft">
+                {submission.aiNeedsWork.map((part) => <li key={part}>{part}</li>)}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
       {submission.aiError && <p className="mt-1.5 text-sm text-ink-soft">Nepavyko įvertinti. Nuotraukos išsaugotos peržiūrai.</p>}
     </div>
   );
