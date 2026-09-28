@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { CookieJar } from "./cookie-jar";
-import { fetchAssessmentsPage, fetchHomeworkPage, fetchMessageDetail, fetchMessagesPage, login } from "./source";
+import { assessmentsPagePath, fetchAssessmentsPage, fetchHomeworkPage, fetchMessageDetail, fetchMessagesPage, login } from "./source";
 import { parseHomework } from "./parse";
 import { assessmentDataRowCount, canReconcileAssessmentSchedule, hasAssessmentsTable, parseAssessments } from "./assessments";
 import { parseMessageDetail, parseMessageList, shouldImportMessage } from "./messages";
@@ -83,7 +83,7 @@ export async function runScrape(): Promise<ScrapeResult> {
       listedMessages = null;
     }
     let assessmentsHtml: string | null = null;
-    log("fetching assessments page");
+    log(`fetching assessments page at ${assessmentsPagePath()}`);
     try {
       assessmentsHtml = await fetchAssessmentsPage(jar);
       log(`assessments page received (${assessmentsHtml.length} bytes)`);

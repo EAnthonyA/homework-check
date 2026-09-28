@@ -167,8 +167,15 @@ async function fetchPath(jar: CookieJar, path: string, label: string): Promise<s
     redirect: "manual",
   });
   jar.update(res);
-  if (res.status >= 400) {
-    throw new HomeworkSourceError(`${label} page returned HTTP ${res.status}`);
+  const location = res.headers.get("location");
+  const redirectTarget = location ? new URL(location, url).pathname : null;
+  console.log(
+    `[scraper] ${label} response: HTTP ${res.status}${redirectTarget ? `; redirect=${redirectTarget}` : ""}`,
+  );
+  if (!res.ok) {
+    throw new HomeworkSourceError(
+      `${label} page returned HTTP ${res.status}${redirectTarget ? ` (redirected to ${redirectTarget})` : ""}`,
+    );
   }
   return res.text();
 }
