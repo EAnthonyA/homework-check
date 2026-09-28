@@ -23,13 +23,17 @@ function cleanText(el: { text: () => string }): string {
   return el.text().replace(/\s+/g, " ").trim();
 }
 
+function assessmentTables($: cheerio.CheerioAPI) {
+  return $("table").filter((_, table) => {
+    if ($(table).attr("id") === "cWorksListTable") return true;
+    const headers = $(table).find("tr").first().find("th").map((__, header) => cleanText($(header))).get();
+    return headers.some((header) => /atsiskaitom.*darbo.*tip/i.test(header));
+  });
+}
+
 export function hasAssessmentsTable(html: string): boolean {
   const $ = cheerio.load(html);
-  return $("table").toArray().some((table) =>
-    $(table).find("tr").first().find("th").toArray().some((header) =>
-      /atsiskaitomojo darbo tipas/i.test(cleanText($(header))),
-    ),
-  );
+  return assessmentTables($).length > 0;
 }
 
 // A genuine empty schedule has no multi-cell data rows. If such rows do exist
@@ -38,9 +42,7 @@ export function hasAssessmentsTable(html: string): boolean {
 export function assessmentDataRowCount(html: string): number {
   const $ = cheerio.load(html);
   let count = 0;
-  $("table").each((_, table) => {
-    const headers = $(table).find("tr").first().find("th").map((__, th) => cleanText($(th))).get();
-    if (!headers.some((header) => /atsiskaitomojo darbo tipas/i.test(header))) return;
+  assessmentTables($).each((_, table) => {
     $(table).find("tr").slice(1).each((__, row) => {
       if ($(row).find("td").length > 1) count += 1;
     });
@@ -63,9 +65,7 @@ export function parseAssessments(html: string): ParsedAssessmentItem[] {
   const $ = cheerio.load(html);
   const items: ParsedAssessmentItem[] = [];
 
-  $("table").each((_, table) => {
-    const headers = $(table).find("tr").first().find("th").map((__, th) => cleanText($(th))).get();
-    if (!headers.some((header) => /atsiskaitomojo darbo tipas/i.test(header))) return;
+  assessmentTables($).each((_, table) => {
 
     $(table).find("tr").slice(1).each((__, row) => {
       const cells = $(row).find("td").map((___, cell) => cleanText($(cell))).get();

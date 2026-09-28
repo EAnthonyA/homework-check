@@ -33,11 +33,11 @@ export interface ScrapeResult {
   messagesChanged: number;
 }
 
-function dumpHtml(html: string): void {
+function dumpHtml(html: string, page: "homework" | "assessments"): void {
   if (process.env.SCRAPER_DEBUG !== "1") return;
   const dir = path.resolve(process.cwd(), "data/debug");
   mkdirSync(dir, { recursive: true });
-  const file = path.join(dir, `homework-${new Date().toISOString().replace(/[:.]/g, "-")}.html`);
+  const file = path.join(dir, `${page}-${new Date().toISOString().replace(/[:.]/g, "-")}.html`);
   writeFileSync(file, html);
   console.log(`[scraper] debug HTML written to ${file}`);
 }
@@ -78,7 +78,8 @@ export async function runScrape(): Promise<ScrapeResult> {
       // Assessment availability must never stop the established homework sync.
       console.error("[scraper] assessments page could not be fetched; keeping the last known schedule:", error);
     }
-    dumpHtml(html);
+    dumpHtml(html, "homework");
+    if (assessmentsHtml) dumpHtml(assessmentsHtml, "assessments");
 
     const parsed = parseHomework(html);
     if (parsed.length === 0) {
@@ -135,12 +136,9 @@ export async function runScrape(): Promise<ScrapeResult> {
       }
     }
 
-    if (assessmentsHtml) {
+    if (assessmentsHtml && hasAssessmentsTable(assessmentsHtml)) {
       const parsedAssessments = parseAssessments(assessmentsHtml);
       const dataRowCount = assessmentDataRowCount(assessmentsHtml);
-      if (!hasAssessmentsTable(assessmentsHtml)) {
-        throw new Error("No assessments table found — keep existing assessments and tune src/lib/scraper/assessments.ts");
-      }
       if (!canReconcileAssessmentSchedule(
         parsedAssessments.length,
         dataRowCount,
@@ -170,6 +168,10 @@ export async function runScrape(): Promise<ScrapeResult> {
         if (result.created) assessmentsAdded += 1;
         else if (result.changed) assessmentsChanged += 1;
       }
+    } else if (assessmentsHtml) {
+      // The source can occasionally serve a page without the schedule table.
+      // Keep the last known schedule and let homework/messages refresh normally.
+      console.error("[scraper] assessments table was not found; keeping the last known schedule");
     }
 
     finishScrapeRun(runId, {

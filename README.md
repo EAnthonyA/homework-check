@@ -65,7 +65,7 @@ pnpm dev               # http://localhost:3000
 | `UPLOAD_DIR` | Directory for uploaded images (`./data/uploads` locally). |
 | `UPLOAD_RETENTION_DAYS` | How long uploaded images are kept; defaults to `3`. Homework records and AI feedback remain. |
 | `APP_URL` | Optional public origin override (defaults to the request origin). |
-| `SCRAPER_DEBUG` | `1` to dump the authenticated homework HTML to `./data/debug`. |
+| `SCRAPER_DEBUG` | `1` to dump authenticated homework and assessments HTML to `./data/debug`. |
 | `GEMINI_API_KEY` | Google AI Studio API key. When set, all photos in a submission are sent together to Gemini to judge whether the task is done and correct. Empty = save photos without AI evaluation. |
 | `GEMINI_VISION_MODEL` | Vision model used for photo evaluation (default `gemini-2.5-flash`). |
 
