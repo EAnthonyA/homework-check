@@ -1,12 +1,12 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { useRef, type ReactNode, type TouchEvent } from "react";
+import { useEffect, useRef, type ReactNode, type TouchEvent } from "react";
 import type { AssessmentsResponse, MessagesResponse, TodayResponse } from "./types";
 
-export type DashboardTab = "homework" | "assessments" | "messages";
+export type DashboardTab = "homework" | "assessments" | "messages" | "consultations";
 
-const TAB_ORDER: DashboardTab[] = ["homework", "assessments", "messages"];
+const TAB_ORDER: DashboardTab[] = ["homework", "assessments", "messages", "consultations"];
 
 export function SwipeableDashboardPanels({
   active,
@@ -61,6 +61,7 @@ export function DashboardTabs({
   onChange: (tab: DashboardTab) => void;
   panelId: string;
 }) {
+  const tabRefs = useRef<Partial<Record<DashboardTab, HTMLButtonElement | null>>>({});
   const homework = useQuery<TodayResponse>({
     queryKey: ["homework", "today"],
     staleTime: 30_000,
@@ -96,22 +97,28 @@ export function DashboardTabs({
     { id: "homework", label: "Namų darbai", count: homework.data?.items.length },
     { id: "assessments", label: "Atsiskaitymai", count: assessments.data?.items.length },
     { id: "messages", label: "Pranešimai", count: messages.data?.items.length },
+    { id: "consultations", label: "Konsultacijos", count: undefined },
   ];
 
+  useEffect(() => {
+    tabRefs.current[active]?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }, [active]);
+
   return (
-    <div role="tablist" aria-label="Mokyklos informacija" className="flex gap-5 border-b border-rule">
+    <div role="tablist" aria-label="Mokyklos informacija" className="flex gap-5 overflow-x-auto border-b border-rule">
       {tabs.map((tab) => {
         const selected = active === tab.id;
         return (
           <button
             key={tab.id}
+            ref={(element) => { tabRefs.current[tab.id] = element; }}
             id={`${panelId}-${tab.id}-tab`}
             type="button"
             role="tab"
             aria-selected={selected}
             aria-controls={`${panelId}-${tab.id}-panel`}
             onClick={() => onChange(tab.id)}
-            className={`-mb-px border-b-2 px-1 pb-2.5 text-[0.9375rem] font-semibold transition-colors ${
+            className={`-mb-px shrink-0 whitespace-nowrap border-b-2 px-1 pb-2.5 text-[0.9375rem] font-semibold transition-colors ${
               selected
                 ? "border-pen text-ink"
                 : "border-transparent text-ink-faint hover:border-rule hover:text-ink-soft"

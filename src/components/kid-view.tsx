@@ -9,6 +9,8 @@ import { PhotoSubmission } from "./photo-submission";
 import { HomeworkSections } from "./homework-sections";
 import { AssessmentPreview } from "./assessment-preview";
 import { MessagesPanel } from "./messages-panel";
+import { ConsultationsPanel } from "./consultations-panel";
+import { LearningFollowup } from "./learning-followup";
 import { DashboardTabs, SwipeableDashboardPanels, type DashboardTab } from "./dashboard-tabs";
 import type { SessionProp, TodayResponse } from "./types";
 
@@ -74,7 +76,7 @@ export function KidView({ session }: { session: SessionProp }) {
               {mine && <div className="mt-4 border-t border-dashed border-rule pt-4">
                 <SubmissionEvidence submission={mine} />
                 {mine.aiDone && mine.aiCorrect === false && (
-                  <p className="mt-2 text-sm text-pen-deep">AI rado klaidų. Pataisyk pagal komentarą ir pateik iš naujo.</p>
+                  <LearningFollowup homeworkId={item.id} submission={mine} />
                 )}
               </div>}
               <PhotoSubmission homeworkId={item.id} replacing={Boolean(mine)} onResult={setNotice} />
@@ -99,6 +101,15 @@ export function KidView({ session }: { session: SessionProp }) {
           className="mt-5"
         >
           <MessagesPanel />
+        </div>
+        <div
+          id="kid-dashboard-consultations-panel"
+          role="tabpanel"
+          aria-labelledby="kid-dashboard-consultations-tab"
+          hidden={activeTab !== "consultations"}
+          className="mt-5"
+        >
+          <ConsultationsPanel />
         </div>
         </SwipeableDashboardPanels>
       </div>

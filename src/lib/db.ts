@@ -44,8 +44,13 @@ function migrate(database: DatabaseSync): void {
   add("ai_done", "ai_done INTEGER");
   add("ai_correct", "ai_correct INTEGER");
   add("ai_summary", "ai_summary TEXT");
+  add("ai_good_parts", "ai_good_parts TEXT");
+  add("ai_needs_work", "ai_needs_work TEXT");
   add("ai_error", "ai_error TEXT");
   add("ai_evaluated_at", "ai_evaluated_at TEXT");
+  add("learning_reason", "learning_reason TEXT");
+  add("learning_question", "learning_question TEXT");
+  add("learning_guidance", "learning_guidance TEXT");
   add("image_paths", "image_paths TEXT");
   database.exec("UPDATE submissions SET image_paths = json_array(image_path) WHERE image_paths IS NULL");
 
