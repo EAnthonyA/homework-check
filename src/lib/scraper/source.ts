@@ -36,7 +36,7 @@ const SEC_CH_UA_PLATFORM = env("HOMEWORK_SOURCE_PLATFORM") || '"macOS"';
 const ACCEPT_HTML =
   "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7";
 
-const DEFAULT_ASSESSMENTS_PAGE = "/l/lt/page/control_work/dates_pupil";
+const DEFAULT_ASSESSMENTS_PAGE = "/1/lt/page/control_work/dates_pupil";
 const DEFAULT_MESSAGES_PAGE = "/1/lt/page/message_new/message_list";
 
 function clientHintHeaders(): Record<string, string> {
@@ -178,7 +178,13 @@ export function fetchHomeworkPage(jar: CookieJar): Promise<string> {
 }
 
 export function assessmentsPagePath(): string {
-  return env("HOMEWORK_SOURCE_ASSESSMENTS_PAGE") || DEFAULT_ASSESSMENTS_PAGE;
+  const configuredPath = env("HOMEWORK_SOURCE_ASSESSMENTS_PAGE");
+  // `/l/lt` was a historical typo in the default. Treat it as the correct
+  // numeric `/1/lt` route so a previously copied setting cannot break syncs.
+  if (configuredPath === "/l/lt/page/control_work/dates_pupil") {
+    return DEFAULT_ASSESSMENTS_PAGE;
+  }
+  return configuredPath || DEFAULT_ASSESSMENTS_PAGE;
 }
 
 export function fetchAssessmentsPage(jar: CookieJar): Promise<string> {

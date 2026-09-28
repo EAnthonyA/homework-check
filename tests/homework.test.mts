@@ -77,7 +77,9 @@ test("assessment parser identifies nonempty rows that it cannot safely reconcile
 test("assessment page has a stable default, while allowing an environment override", () => {
   const previous = process.env.HOMEWORK_SOURCE_ASSESSMENTS_PAGE;
   delete process.env.HOMEWORK_SOURCE_ASSESSMENTS_PAGE;
-  assert.equal(assessmentsPagePath(), "/l/lt/page/control_work/dates_pupil");
+  assert.equal(assessmentsPagePath(), "/1/lt/page/control_work/dates_pupil");
+  process.env.HOMEWORK_SOURCE_ASSESSMENTS_PAGE = "/l/lt/page/control_work/dates_pupil";
+  assert.equal(assessmentsPagePath(), "/1/lt/page/control_work/dates_pupil");
   process.env.HOMEWORK_SOURCE_ASSESSMENTS_PAGE = "/custom-assessments";
   assert.equal(assessmentsPagePath(), "/custom-assessments");
   if (previous === undefined) delete process.env.HOMEWORK_SOURCE_ASSESSMENTS_PAGE;
