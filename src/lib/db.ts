@@ -33,6 +33,11 @@ export function getDb(): DatabaseSync {
 // creates tables if they don't exist, so columns added later need a manual
 // ALTER TABLE guarded by PRAGMA table_info.
 function migrate(database: DatabaseSync): void {
+  const users = database.prepare("PRAGMA table_info(users)").all() as Array<{ name: string }>;
+  if (users.some((c) => c.name === "encrypted_refresh_token")) {
+    database.exec("UPDATE users SET encrypted_refresh_token = NULL WHERE encrypted_refresh_token IS NOT NULL");
+  }
+
   const submissions = database.prepare("PRAGMA table_info(submissions)").all() as Array<{
     name: string;
   }>;

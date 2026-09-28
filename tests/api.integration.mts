@@ -14,8 +14,8 @@ test("authenticated upload, history and undo against the production server", { t
   const db = new DatabaseSync(dbPath);
   db.exec(SCHEMA_SQL);
   db.exec(`
-    INSERT INTO users (id, google_sub, email, name, role, calendar_enabled) VALUES ('parent', 'parent', 'parent@example.test', 'Tėvai', 'parent', 0);
-    INSERT INTO users (id, google_sub, email, name, role, calendar_enabled) VALUES ('kid', 'kid', 'kid@example.test', 'Vaikas', 'kid', 0);
+    INSERT INTO users (id, google_sub, email, name, role) VALUES ('parent', 'parent', 'parent@example.test', 'Tėvai', 'parent');
+    INSERT INTO users (id, google_sub, email, name, role) VALUES ('kid', 'kid', 'kid@example.test', 'Vaikas', 'kid');
     INSERT INTO homework_items (id, source_id, subject, description, due_date) VALUES ('overdue', 'overdue', 'Matematika', 'Trys puslapiai', '2020-01-01');
   `);
   db.close();
@@ -108,7 +108,7 @@ test("authenticated upload, history and undo against the production server", { t
     for (let index = 0; index < 2; index++) {
       const response = await request("/api/homework/overdue/done", parent, { method: "DELETE" });
       assert.equal(response.status, 200);
-      assert.equal((await response.json()).calendarFailed, 0);
+      assert.equal((await response.json()).ok, true);
     }
     assert.equal((await (await request("/api/homework/history", parent)).json()).items.length, 0);
     for (const session of [parent, kid]) {

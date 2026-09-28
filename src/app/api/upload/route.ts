@@ -4,7 +4,6 @@ import { getHomeworkById, commitSubmission } from "@/lib/repo";
 import { saveUpload, discardUnsavedUploads } from "@/lib/uploads";
 import { validatePhotos } from "@/lib/upload-rules";
 import { evaluateHomeworkImages, isAiConfigured } from "@/lib/ai";
-import { removeHomeworkFromCalendars } from "@/lib/calendar";
 
 export async function POST(request: Request) {
   const session = await getSession();
@@ -84,22 +83,11 @@ export async function POST(request: Request) {
     // AI approval requires a complete *and* correct solution. Incorrect or
     // unverifiable work stays active with its photos and feedback for a retry.
     const completed = ai?.done === true && ai.correct === true;
-    let calendarFailed = 0;
-    if (completed) {
-      try {
-        calendarFailed = (await removeHomeworkFromCalendars(homeworkId)).failed;
-      } catch (error) {
-        console.error("[calendar] could not remove completed homework:", error);
-        calendarFailed = 1;
-      }
-    }
-
     return NextResponse.json({
       ok: true,
       imagePath: imagePaths[0],
       imagePaths,
       completed,
-      calendarFailed,
       ai: ai
         ? { done: ai.done, correct: ai.correct, summary: ai.summary, goodParts: ai.goodParts, needsWork: ai.needsWork }
         : null,

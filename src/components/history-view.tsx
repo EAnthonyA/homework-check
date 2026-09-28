@@ -25,12 +25,10 @@ export function HistoryView({ session }: { session: SessionProp }) {
     mutationFn: async (homeworkId: string) => {
       const response = await fetch(`/api/homework/${homeworkId}/done`, { method: "DELETE" });
       if (!response.ok) throw new Error("Nepavyko grąžinti darbo. Bandyk dar kartą.");
-      return response.json() as Promise<{ calendarFailed: number }>;
+      return response.json() as Promise<{ ok: true }>;
     },
-    onSuccess: (result) => {
-      setNotice(result.calendarFailed
-        ? "Darbas grąžintas į neatliktus. Kalendoriaus atnaujinti nepavyko — bandyk sinchronizuoti nustatymuose."
-        : "Darbas grąžintas į neatliktus. Jį vėl matote namų darbų sąraše.");
+    onSuccess: () => {
+      setNotice("Darbas grąžintas į neatliktus. Jį vėl matote namų darbų sąraše.");
       queryClient.invalidateQueries({ queryKey: ["homework"] });
     },
   });

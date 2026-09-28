@@ -1,9 +1,8 @@
-// Hand-rolled Google OAuth helpers (sign-in + Calendar API scope).
+// Hand-rolled Google OAuth helpers for sign-in.
 export const GOOGLE_SCOPES = [
   "openid",
   "email",
   "profile",
-  "https://www.googleapis.com/auth/calendar.events",
 ];
 
 export function buildGoogleAuthUrl(input: { redirectUri: string; state: string }): string {
@@ -12,8 +11,7 @@ export function buildGoogleAuthUrl(input: { redirectUri: string; state: string }
     redirect_uri: input.redirectUri,
     response_type: "code",
     scope: GOOGLE_SCOPES.join(" "),
-    access_type: "offline",
-    prompt: "consent",
+    prompt: "select_account",
     state: input.state,
   });
   return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;

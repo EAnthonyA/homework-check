@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { getHomeworkById, markHomeworkDone, reopenHomework } from "@/lib/repo";
-import { removeHomeworkFromCalendars, syncAllUsers } from "@/lib/calendar";
 
 export async function POST(_req: Request, ctx: RouteContext<"/api/homework/[id]/done">) {
   const session = await getSession();
@@ -13,9 +12,7 @@ export async function POST(_req: Request, ctx: RouteContext<"/api/homework/[id]/
   if (!item) return NextResponse.json({ error: "not found" }, { status: 404 });
 
   markHomeworkDone(id, session.id);
-  const removed = await removeHomeworkFromCalendars(id);
-
-  return NextResponse.json({ ok: true, calendarRemoved: removed.deleted, calendarFailed: removed.failed });
+  return NextResponse.json({ ok: true });
 }
 
 export async function DELETE(_req: Request, ctx: RouteContext<"/api/homework/[id]/done">) {
@@ -28,11 +25,5 @@ export async function DELETE(_req: Request, ctx: RouteContext<"/api/homework/[id
   if (!item) return NextResponse.json({ error: "not found" }, { status: 404 });
 
   reopenHomework(id);
-  try {
-    const sync = await syncAllUsers([getHomeworkById(id)!]);
-    return NextResponse.json({ ok: true, calendarCreated: sync.created, calendarFailed: sync.failed });
-  } catch (error) {
-    console.error("[calendar] could not restore reopened homework:", error);
-    return NextResponse.json({ ok: true, calendarCreated: 0, calendarFailed: 1 });
-  }
+  return NextResponse.json({ ok: true });
 }

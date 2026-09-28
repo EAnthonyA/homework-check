@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Calendar, History, LogOut, RefreshCw } from "lucide-react";
+import { History, LogOut, RefreshCw } from "lucide-react";
 import { Header } from "./header";
 import type { SessionProp } from "./types";
 
@@ -12,7 +12,6 @@ interface SettingsUser {
   email: string;
   name: string;
   role: string;
-  calendarEnabled: boolean;
 }
 
 interface ScrapeRun {
@@ -59,19 +58,6 @@ export function SettingsView({ session }: { session: SessionProp }) {
     },
   });
 
-  const toggleCalendar = useMutation({
-    mutationFn: async (calendarEnabled: boolean) => {
-      const res = await fetch("/api/settings", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ calendarEnabled }),
-      });
-      if (!res.ok) throw new Error("failed");
-      return res.json();
-    },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["settings"] }),
-  });
-
   const scrapeNow = useMutation({
     mutationFn: async () => {
       const res = await fetch("/api/scrape", { method: "POST" });
@@ -86,15 +72,6 @@ export function SettingsView({ session }: { session: SessionProp }) {
         queryClient.invalidateQueries({ queryKey: ["assessments"] }),
         queryClient.invalidateQueries({ queryKey: ["messages"] }),
       ]);
-    },
-  });
-
-  const syncCalendar = useMutation({
-    mutationFn: async () => {
-      const res = await fetch("/api/calendar/sync", { method: "POST" });
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(body?.error ?? "failed");
-      return body;
     },
   });
 
@@ -118,7 +95,7 @@ export function SettingsView({ session }: { session: SessionProp }) {
         <h1 className="font-display text-[2rem] font-black leading-tight tracking-tight text-ink">
           Nustatymai
         </h1>
-        <p className="mt-1.5 text-ink-soft">Paskyra, kalendorius ir atnaujinimai.</p>
+        <p className="mt-1.5 text-ink-soft">Paskyra ir atnaujinimai.</p>
       </section>
 
       <div className="mt-7 flex flex-col gap-5 px-5">
@@ -133,34 +110,6 @@ export function SettingsView({ session }: { session: SessionProp }) {
             <span className="shrink-0 rounded-full bg-slate/10 px-3 py-1 text-xs font-semibold text-slate">
               {session.role === "parent" ? "Tėvas / mama" : "Vaikas"}
             </span>
-          </div>
-        </section>
-
-        {/* Calendar toggle */}
-        <section className="sheet p-5 pl-10">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <h2 className="font-display text-lg font-bold text-ink">Google kalendorius</h2>
-              <p className="mt-1 text-sm leading-relaxed text-ink-soft">
-                Namų darbai ir atsiskaitymai automatiškai patenka į tavo kalendorių.
-              </p>
-            </div>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={Boolean(user?.calendarEnabled)}
-              disabled={toggleCalendar.isPending || !user}
-              onClick={() => toggleCalendar.mutate(!user?.calendarEnabled)}
-              className={`relative h-7 w-[3.25rem] shrink-0 rounded-full transition-colors disabled:opacity-50 ${
-                user?.calendarEnabled ? "bg-leaf" : "bg-rule"
-              }`}
-            >
-              <span
-                className={`absolute top-1 h-5 w-5 rounded-full bg-sheet shadow-sm transition-all ${
-                  user?.calendarEnabled ? "left-[1.75rem]" : "left-1"
-                }`}
-              />
-            </button>
           </div>
         </section>
 
@@ -203,32 +152,6 @@ export function SettingsView({ session }: { session: SessionProp }) {
               Paskutinis atnaujinimas:{" "}
               {formatWhen(scrapeRun.data?.run?.finished_at, "Dar nebuvo")}
             </p>
-          </section>
-        )}
-
-        {/* Calendar sync (parent only) */}
-        {isParent && (
-          <section className="sheet p-5 pl-10">
-            <h2 className="font-display text-lg font-bold text-ink">Sinchronizuoti kalendorių</h2>
-            <p className="mt-1 text-sm leading-relaxed text-ink-soft">
-              Sukurti kalendoriaus įvykius visiems vartotojams.
-            </p>
-            <button
-              type="button"
-              disabled={syncCalendar.isPending}
-              onClick={() => syncCalendar.mutate()}
-              className="btn btn-primary mt-4 w-full"
-            >
-              <Calendar className="h-4 w-4" />
-              Sinchronizuoti kalendorių
-            </button>
-            {syncCalendar.isSuccess && (
-              <p className="font-hand mt-2 text-xl text-leaf-deep">
-                {syncCalendar.data?.calendarFailed
-                  ? `Nepavyko sinchronizuoti ${syncCalendar.data.calendarFailed} įvykių. Bandyk dar kartą.`
-                  : `OK (+${syncCalendar.data?.calendarCreated ?? 0})`}
-              </p>
-            )}
           </section>
         )}
 

@@ -1,9 +1,6 @@
-// Scheduled scraper + calendar sync (runs inside the Next.js server process).
+// Scheduled scraper (runs inside the Next.js server process).
 import cron from "node-cron";
 import { runScrape } from "./scraper/run";
-import { syncAllUsers, syncAssessmentsForAllUsers } from "./calendar";
-import { listUnfinishedHomework, listUpcomingAssessments } from "./repo";
-import { vilniusDateString } from "./timezone";
 import { purgeExpiredUploads } from "./uploads";
 
 let started = false;
@@ -35,15 +32,10 @@ export function startScheduler(): void {
       console.log("[scheduler] running scrape at", new Date().toISOString());
       try {
         const result = await runScrape();
-        const [homeworkSync, assessmentSync] = await Promise.all([
-          syncAllUsers(listUnfinishedHomework()),
-          syncAssessmentsForAllUsers(listUpcomingAssessments(vilniusDateString())),
-        ]);
         console.log(
           `[scheduler] scrape done (+${result.itemsAdded} items, ~${result.itemsChanged} changed); ` +
             `assessments +${result.assessmentsAdded}, ~${result.assessmentsChanged} changed; ` +
-            `messages +${result.messagesAdded}, ~${result.messagesChanged} changed; ` +
-            `calendar: +${homeworkSync.created + assessmentSync.created} events`,
+            `messages +${result.messagesAdded}, ~${result.messagesChanged} changed`,
         );
       } catch (err) {
         console.error("[scheduler] scrape failed:", err);

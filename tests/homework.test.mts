@@ -1,11 +1,10 @@
 import assert from "node:assert/strict";
-import { after, test, mock } from "node:test";
+import { after, test } from "node:test";
 import { mkdtempSync, readdirSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { execFileSync } from "node:child_process";
-import { google } from "googleapis";
 import { SCHEMA_SQL } from "../src/lib/schema";
 import { assessmentDataRowCount, canReconcileAssessmentSchedule, parseAssessments } from "../src/lib/scraper/assessments";
 import { parseMessageDetail, parseMessageList, shouldImportMessage } from "../src/lib/scraper/messages";
@@ -14,7 +13,6 @@ import { assessmentsPagePath } from "../src/lib/scraper/source";
 const directory = mkdtempSync(path.join(tmpdir(), "homework-unit-"));
 process.env.DB_PATH = path.join(directory, "test.db");
 process.env.UPLOAD_DIR = path.join(directory, "uploads");
-process.env.ENCRYPTION_KEY = "test-encryption-key-for-homework-1234567890";
 
 // Start with the deployed single-image schema to exercise real startup migration.
 const legacy = new DatabaseSync(process.env.DB_PATH);
@@ -34,8 +32,6 @@ const { submissionView } = await import("../src/lib/submission-view");
 const { validatePhotos, MAX_PHOTO_BYTES } = await import("../src/lib/upload-rules");
 const { saveUpload, discardUnsavedUploads, purgeExpiredUploads, uploadDir } = await import("../src/lib/uploads");
 const { evaluateHomeworkImages } = await import("../src/lib/ai");
-const { syncAllUsers, removeHomeworkFromCalendars } = await import("../src/lib/calendar");
-const { encrypt } = await import("../src/lib/crypto");
 
 after(() => {
   getDb().close();
@@ -270,81 +266,5 @@ test("Gemini receives all pages in one request and returns one combined verdict"
   });
   const verdict = await evaluateHomeworkImages({ images: [1, 2, 3].map((n) => ({ imageBytes: new Uint8Array([n]), mimeType: "image/jpeg" })), subject: "Matematika", description: "Trys puslapiai", details: null });
   assert.equal(requests, 1);
-  assert.deepEqual(verdict, { done: true, correct: false, summary: "Patikrink atsakymą." });
-});
-
-test("calendar undo restores original dates once and respects preferences", async () => {
-  repo.updateRefreshToken("kid", encrypt("test-token"));
-  repo.setCalendarEnabled("parent", false);
-  const item = homework("calendar", "2020-02-03");
-  let inserts = 0;
-  const requestBodies: unknown[] = [];
-  const calendarMock = mock.method(google as unknown as { calendar: () => unknown }, "calendar", () => ({ events: {
-    insert: async ({ requestBody }: { requestBody: unknown }) => { requestBodies.push(requestBody); return { data: { id: `event-${++inserts}` } }; },
-    get: async () => ({ data: requestBodies.at(-1) }),
-    delete: async () => ({}),
-  } }) as unknown as ReturnType<typeof google.calendar>);
-  try {
-    await syncAllUsers([item]);
-    repo.markHomeworkDone(item.id, "parent");
-    await removeHomeworkFromCalendars(item.id);
-    assert.equal(repo.getCalendarEvent("kid", item.id), undefined);
-    repo.reopenHomework(item.id);
-    assert.equal((await syncAllUsers([item])).created, 1);
-    assert.equal((await syncAllUsers([item])).created, 0);
-    assert.equal(inserts, 2);
-    assert.deepEqual(requestBodies[0], requestBodies[1]);
-    assert.equal(repo.getCalendarEvent("parent", item.id), undefined);
-  } finally { calendarMock.mock.restore(); }
-});
-
-test("calendar failures preserve reopened state and cancelled events are recreated", async () => {
-  const item = homework("calendar-failure");
-  repo.markHomeworkDone(item.id, "parent");
-  repo.reopenHomework(item.id);
-  repo.upsertCalendarEvent("kid", item.id, "cancelled-event");
-  let fail = true;
-  const calendarMock = mock.method(google as unknown as { calendar: () => unknown }, "calendar", () => ({ events: {
-    get: async () => ({ data: { status: "cancelled" } }),
-    insert: async () => {
-      if (fail) throw new Error("Simulated calendar outage");
-      return { data: { id: "restored-event" } };
-    },
-  } }));
-  const logger = mock.method(console, "error", () => {});
-  try {
-    assert.equal((await syncAllUsers([item])).failed, 1);
-    assert.equal(repo.getHomeworkById(item.id)!.done_at, null);
-    fail = false;
-    assert.equal((await syncAllUsers([item])).created, 1);
-    assert.equal(repo.getCalendarEvent("kid", item.id)!.google_event_id, "restored-event");
-  } finally {
-    calendarMock.mock.restore();
-    logger.mock.restore();
-  }
-});
-
-test("reopening while calendar deletion is in flight restores the event afterward", async () => {
-  const item = homework("calendar-race");
-  repo.upsertCalendarEvent("kid", item.id, "old-event");
-  repo.markHomeworkDone(item.id, "parent");
-  let deletionStarted!: () => void;
-  const started = new Promise<void>((resolve) => { deletionStarted = resolve; });
-  let finishDeletion!: () => void;
-  const pending = new Promise<void>((resolve) => { finishDeletion = resolve; });
-  const operations: string[] = [];
-  const calendarMock = mock.method(google as unknown as { calendar: () => unknown }, "calendar", () => ({ events: {
-    delete: async () => { operations.push("delete"); deletionStarted(); await pending; },
-    insert: async () => { operations.push("insert"); return { data: { id: "new-event" } }; },
-  } }));
-  try {
-    const removal = removeHomeworkFromCalendars(item.id);
-    await started;
-    repo.reopenHomework(item.id);
-    const restoration = syncAllUsers([item]);
-    finishDeletion();
-    await Promise.all([removal, restoration]);
-    assert.deepEqual(operations, ["delete", "insert"]);
-    assert.equal(repo.getCalendarEvent("kid", item.id)!.google_event_id, "new-event");
-  } finally { calendarMock.mock.restore(); }
+  assert.deepEqual(verdict, { done: true, correct: false, summary: "Patikrink atsakymą.", goodParts: [], needsWork: [] });
 });

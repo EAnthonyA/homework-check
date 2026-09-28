@@ -24,11 +24,10 @@ export default function TermsPage() {
         </PublicList>
       </PublicSection>
 
-      <PublicSection title="Turinys ir kalendorius">
+      <PublicSection title="Turinys">
         <p>
           Namų darbų informacija pateikiama patogumui. Prieš atlikdami užduotį ar remdamiesi terminu, patikrinkite
-          oficialius mokyklos pranešimus. Google Calendar įvykiai yra priminimai; juos galite bet kada pakeisti ar
-          pašalinti savo kalendoriuje.
+          oficialius mokyklos pranešimus.
         </p>
       </PublicSection>
 

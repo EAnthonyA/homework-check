@@ -14,9 +14,6 @@ export interface UserRow {
   name: string;
   picture: string | null;
   role: Role;
-  calendar_enabled: number;
-  encrypted_refresh_token: string | null;
-  calendar_timezone: string;
   created_at: string;
   updated_at: string;
 }
@@ -123,8 +120,8 @@ function stmt(sql: string): StatementSync {
 // ---------- Users ----------
 
 const UPSERT_USER_SQL = `
-  INSERT INTO users (id, google_sub, email, name, picture, role, encrypted_refresh_token)
-  VALUES (?, ?, ?, ?, ?, ?, ?)
+  INSERT INTO users (id, google_sub, email, name, picture, role)
+  VALUES (?, ?, ?, ?, ?, ?)
   ON CONFLICT(google_sub) DO UPDATE SET
     email = excluded.email,
     name = excluded.name,
@@ -137,7 +134,6 @@ export function upsertUser(input: {
   name: string;
   picture: string | null;
   role: Role;
-  encryptedRefreshToken?: string | null;
 }): UserRow {
   stmt(UPSERT_USER_SQL).run(
     newId(),
@@ -146,7 +142,6 @@ export function upsertUser(input: {
     input.name,
     input.picture,
     input.role,
-    input.encryptedRefreshToken ?? null,
   );
   return getUserByGoogleSub(input.googleSub)!;
 }
@@ -165,18 +160,6 @@ export function getUserByEmail(email: string): UserRow | undefined {
 
 export function listUsers(): UserRow[] {
   return stmt("SELECT * FROM users ORDER BY created_at ASC").all() as unknown as UserRow[];
-}
-
-export function updateRefreshToken(id: string, encrypted: string | null): void {
-  stmt(
-    "UPDATE users SET encrypted_refresh_token = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?",
-  ).run(encrypted, id);
-}
-
-export function setCalendarEnabled(id: string, enabled: boolean): void {
-  stmt(
-    "UPDATE users SET calendar_enabled = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?",
-  ).run(enabled ? 1 : 0, id);
 }
 
 export function setUserRole(id: string, role: Role): void {
@@ -568,65 +551,6 @@ export function listSubmissionsForHomework(homeworkId: string): SubmissionWithUs
   WHERE s.homework_id = ?
   ORDER BY s.created_at ASC
 `).all(homeworkId) as unknown as SubmissionWithUser[];
-}
-
-// ---------- Calendar events ----------
-
-export function getCalendarEvent(
-  userId: string,
-  homeworkId: string,
-): { id: string; google_event_id: string } | undefined {
-  return stmt("SELECT * FROM calendar_events WHERE user_id = ? AND homework_id = ?").get(userId, homeworkId) as
-    | { id: string; google_event_id: string }
-    | undefined;
-}
-
-const UPSERT_CALENDAR_EVENT_SQL = `
-  INSERT INTO calendar_events (id, user_id, homework_id, google_event_id)
-  VALUES (?, ?, ?, ?)
-  ON CONFLICT(user_id, homework_id) DO UPDATE SET
-    google_event_id = excluded.google_event_id,
-    synced_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
-`;
-export function upsertCalendarEvent(userId: string, homeworkId: string, googleEventId: string): void {
-  stmt(UPSERT_CALENDAR_EVENT_SQL).run(newId(), userId, homeworkId, googleEventId);
-}
-
-export function deleteCalendarEvent(userId: string, homeworkId: string): void {
-  stmt("DELETE FROM calendar_events WHERE user_id = ? AND homework_id = ?").run(userId, homeworkId);
-}
-
-export function getAssessmentCalendarEvent(
-  userId: string,
-  assessmentId: string,
-): { id: string; google_event_id: string } | undefined {
-  return stmt("SELECT * FROM assessment_calendar_events WHERE user_id = ? AND assessment_id = ?").get(userId, assessmentId) as
-    | { id: string; google_event_id: string }
-    | undefined;
-}
-
-const UPSERT_ASSESSMENT_CALENDAR_EVENT_SQL = `
-  INSERT INTO assessment_calendar_events (id, user_id, assessment_id, google_event_id)
-  VALUES (?, ?, ?, ?)
-  ON CONFLICT(user_id, assessment_id) DO UPDATE SET
-    google_event_id = excluded.google_event_id,
-    synced_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
-`;
-export function upsertAssessmentCalendarEvent(userId: string, assessmentId: string, googleEventId: string): void {
-  stmt(UPSERT_ASSESSMENT_CALENDAR_EVENT_SQL).run(newId(), userId, assessmentId, googleEventId);
-}
-
-export function deleteAssessmentCalendarEvent(userId: string, assessmentId: string): void {
-  stmt("DELETE FROM assessment_calendar_events WHERE user_id = ? AND assessment_id = ?").run(userId, assessmentId);
-}
-
-export function listRetiredAssessmentCalendarEvents(userId: string): Array<{ assessment_id: string; google_event_id: string }> {
-  return stmt(`
-    SELECT e.assessment_id, e.google_event_id
-    FROM assessment_calendar_events e
-    JOIN assessment_items a ON a.id = e.assessment_id
-    WHERE e.user_id = ? AND a.active = 0
-  `).all(userId) as unknown as Array<{ assessment_id: string; google_event_id: string }>;
 }
 
 // ---------- Scrape runs ----------

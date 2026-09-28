@@ -1,13 +1,11 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { exchangeCode, fetchUserInfo } from "@/lib/google-oauth";
-import { encrypt } from "@/lib/crypto";
 import { signSession, SESSION_COOKIE, SESSION_MAX_AGE_SECONDS } from "@/lib/auth";
 import {
   upsertUser,
   getUserByGoogleSub,
   listUsers,
-  updateRefreshToken,
   type Role,
 } from "@/lib/repo";
 
@@ -57,8 +55,6 @@ export async function GET(request: Request) {
     if (!isAllowedEmail(info.email)) {
       return NextResponse.redirect(new URL("/login?error=denied", url.origin));
     }
-    const encrypted = tokens.refresh_token ? encrypt(tokens.refresh_token) : null;
-
     const existing = getUserByGoogleSub(info.sub);
     let user;
     if (existing) {
@@ -69,7 +65,6 @@ export async function GET(request: Request) {
         picture: info.picture ?? null,
         role: existing.role,
       });
-      if (encrypted) updateRefreshToken(user.id, encrypted);
     } else {
       user = upsertUser({
         googleSub: info.sub,
@@ -77,7 +72,6 @@ export async function GET(request: Request) {
         name: info.name,
         picture: info.picture ?? null,
         role: resolveRole(info.email),
-        encryptedRefreshToken: encrypted,
       });
     }
 

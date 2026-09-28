@@ -3,17 +3,16 @@
 A small family app that keeps track of homework:
 
 - **Scrapes** an external school homework page (login + endpoints configured via env vars).
-- **Parses** homework items by date.
-- **Publishes** each item as an all-day event on every family member's own Google Calendar.
+- **Parses** homework, upcoming assessments, and messages.
 - **Shows** unfinished homework, including overdue work, to parents and kids.
 - **Lets the kid submit 1–3 photos** together for one Gemini verdict (done? correct?). Only an AI verdict that it is both done and correct, or a parent's action, marks the homework complete.
-- **Keeps completion history** with the latest photos per kid, AI verdicts, and completion source. Parents can reopen work, preserving its evidence and restoring calendar events.
+- **Keeps completion history** with the latest photos per kid, AI verdicts, and completion source. Parents can reopen work while preserving its evidence.
 
 ## Tech stack
 
 - Next.js 16 (App Router) + TypeScript + Tailwind CSS v4
 - SQLite via Node's built-in `node:sqlite` (plain SQL, no ORM — see `src/lib/schema.ts`)
-- Google OAuth (hand-rolled) + Google Calendar API
+- Google OAuth (hand-rolled)
 - Scheduled scraping via `node-cron` (Europe/Vilnius, default 15:00)
 - Deployed as a single Docker container
 
@@ -21,20 +20,18 @@ A small family app that keeps track of homework:
 
 1. On schedule (or manually), the app logs in to the configured homework source,
    fetches the homework page and upserts parsed items into SQLite.
-2. After each scrape, every connected user's calendar is synced (idempotent —
-   each event is created once, tracked in the `calendar_events` table).
-3. Kids select or photograph 1–3 pages (up to 10 MB each), preview them, and submit
+2. Kids select or photograph 1–3 pages (up to 10 MB each), preview them, and submit
    all pages for one evaluation. The latest submission replaces the previous one
    for that kid and homework. Files live on local disk behind authenticated URLs.
-4. When `GEMINI_API_KEY` is set, Gemini evaluates all pages together. Only
+3. When `GEMINI_API_KEY` is set, Gemini evaluates all pages together. Only
    `done: true` together with `correct: true` completes the work. If it finds
    mistakes, the child sees the feedback beside the active homework and can
    correct and submit it again. Without AI, or if evaluation fails or cannot
    verify correctness, the photos remain available for parent review and the
    work stays unfinished.
-5. Parents see photos and verdicts in both active work and completion history.
-   Reopening work clears its completion, keeps its evidence, and restores its
-   original calendar dates. Overdue work reappears in both active views.
+4. Parents see photos and verdicts in both active work and completion history.
+   Reopening work clears its completion and keeps its evidence. Overdue work
+   reappears in both active views.
    Existing history whose completion source was not recorded uses a neutral label.
 
 ## Setup (local)
@@ -58,7 +55,6 @@ pnpm dev               # http://localhost:3000
 | `DB_PATH` | Path to the SQLite file (`./data/app.db` locally, `/data/app.db` in Docker). |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google OAuth web client credentials. |
 | `SESSION_SECRET` | 32+ char random string for session JWT signing (`openssl rand -hex 32`). |
-| `ENCRYPTION_KEY` | 32+ char random string for encrypting refresh tokens at rest. |
 | `PARENT_EMAILS` | Comma-separated parent emails. First signed-in user defaults to parent. |
 | `ALLOWED_EMAILS` | Comma-separated emails allowed to sign in. Empty = anyone can sign in. `PARENT_EMAILS` are always allowed. |
 | `SCRAPE_CRON` | Cron expression (Europe/Vilnius). Default `0 15 * * *`. |
@@ -94,16 +90,14 @@ behaves differently, adjust `src/lib/scraper/source.ts`.
 
 ## Google Cloud setup
 
-1. Create a project, enable the **Google Calendar API**.
-2. Configure the **OAuth consent screen** (External, Testing mode) and add your
+1. Configure the **OAuth consent screen** (External, Testing mode) and add your
    family emails as test users. Testing mode needs no verification.
-3. Create an **OAuth client ID** (Web application) and add redirect URIs:
+2. Create an **OAuth client ID** (Web application) and add redirect URIs:
    - `http://localhost:3000/api/auth/callback`
    - `https://<your-domain>/api/auth/callback`
 4. Copy the client ID/secret into `.env`.
 
-Every user who signs in is asked for calendar access; their refresh token is
-stored encrypted in the DB and used to create events on their primary calendar.
+Google is used only for sign-in. The app does not access or sync Google Calendar.
 
 ## Roles
 
@@ -116,7 +110,7 @@ stored encrypted in the DB and used to create events on their primary calendar.
 SCRAPER_DEBUG=1 pnpm scrape
 ```
 
-This logs in, fetches the homework page, dumps the HTML to `./data/debug`, and
+This logs in, fetches the homework and assessments pages, dumps their HTML to `./data/debug`, and
 prints the parsed items. Tune the selectors in `src/lib/scraper/parse.ts` if
 parsing returns nothing or the wrong fields.
 
@@ -136,9 +130,8 @@ via `env_file`).
 - `src/lib/schema.ts` — SQL schema
 - `src/lib/repo.ts` — typed data-access functions
 - `src/lib/scraper/` — source login + fetch (`source.ts`, `cookie-jar.ts`), parser (`parse.ts`), orchestration (`run.ts`)
-- `src/lib/calendar.ts` — Google Calendar sync
 - `src/lib/auth.ts` — cookie-based session (JWT)
 - `src/lib/scheduler.ts` — cron schedule
-- `src/app/api/` — route handlers (auth, homework, scrape, calendar, upload)
+- `src/app/api/` — route handlers (auth, homework, scrape, upload)
 - `src/app/` + `src/components/` — UI (parent dashboard, kid view, settings)
 - `src/i18n/` — Lithuanian + English strings

@@ -10,11 +10,11 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 # Namų darbai (Homework Check)
 
-Family homework tracker: scrapes an external school page → parses homework → syncs
-all-day events to each user's Google Calendar → parent/kid web views with photo
-upload ("done"). Stack: Next.js 16 (App Router) + React 19 + TypeScript, Tailwind
-v4, SQLite via `node:sqlite`, hand-rolled Google OAuth + Calendar API, `node-cron`,
-single Docker container. Full setup, env vars and Google Cloud steps: see `README.md`.
+Family homework tracker: scrapes an external school page → parses homework,
+assessments, and messages → parent/kid web views with photo upload ("done").
+Stack: Next.js 16 (App Router) + React 19 + TypeScript, Tailwind v4, SQLite via
+`node:sqlite`, hand-rolled Google OAuth, `node-cron`, single Docker container.
+Full setup and env vars: see `README.md`.
 
 ## Commands
 
@@ -30,7 +30,7 @@ single Docker container. Full setup, env vars and Google Cloud steps: see `READM
 - `src/lib/repo.ts` — typed data access (plain SQL, no ORM)
 - `src/lib/auth.ts` — cookie JWT session · `src/lib/google-oauth.ts` — hand-rolled OAuth
 - `src/lib/scraper/` — `source.ts` (login/fetch), `parse.ts` (cheerio), `run.ts` (orchestration), `cookie-jar.ts`
-- `src/lib/calendar.ts` — Calendar sync · `src/lib/scheduler.ts` — cron
+- `src/lib/scheduler.ts` — cron
 - `src/lib/{timezone,sanitize,crypto,uploads}.ts` — Vilnius dates, free-text cleanup, AES-GCM, image uploads
 - `src/app/api/` — route handlers · `src/app/` + `src/components/` — server pages + client views
 
@@ -58,7 +58,6 @@ single Docker container. Full setup, env vars and Google Cloud steps: see `READM
 
 ### Data safety
 - Run all user/AI-facing free text through `sanitizeFreeText()` (`src/lib/sanitize.ts`).
-- Encrypt secrets at rest (Google refresh tokens) via `encrypt()`/`decrypt()` (`src/lib/crypto.ts`, AES-256-GCM).
 - Uploaded photos are served via `/api/uploads/[name]` behind a `getSession()` check — keep that check if you touch the route.
 
 ### Scraper

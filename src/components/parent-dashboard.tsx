@@ -38,8 +38,8 @@ export function ParentDashboard({ session }: { session: SessionProp }) {
       }
       return res.json();
     },
-    onSuccess: (result) => {
-      setNotice(result.calendarFailed ? "Darbas pažymėtas atliktu, bet nepavyko pašalinti jo iš kalendoriaus." : "Darbas perkeltas į istoriją. Ten gali jį grąžinti taisyti.");
+    onSuccess: () => {
+      setNotice("Darbas perkeltas į istoriją. Ten gali jį grąžinti taisyti.");
       queryClient.invalidateQueries({ queryKey: ["homework", "today"] });
       queryClient.invalidateQueries({ queryKey: ["homework", "history"] });
     },
