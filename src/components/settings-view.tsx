@@ -79,7 +79,14 @@ export function SettingsView({ session }: { session: SessionProp }) {
       if (!res.ok) throw new Error(body?.error ?? "failed");
       return body;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["scrape", "latest"] }),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["scrape", "latest"] }),
+        queryClient.invalidateQueries({ queryKey: ["homework"] }),
+        queryClient.invalidateQueries({ queryKey: ["assessments"] }),
+        queryClient.invalidateQueries({ queryKey: ["messages"] }),
+      ]);
+    },
   });
 
   const syncCalendar = useMutation({
