@@ -8,7 +8,7 @@ import { execFileSync } from "node:child_process";
 import { google } from "googleapis";
 import { SCHEMA_SQL } from "../src/lib/schema";
 import { assessmentDataRowCount, canReconcileAssessmentSchedule, parseAssessments } from "../src/lib/scraper/assessments";
-import { parseMessageDetail, parseMessageList } from "../src/lib/scraper/messages";
+import { parseMessageDetail, parseMessageList, shouldImportMessage } from "../src/lib/scraper/messages";
 import { assessmentsPagePath } from "../src/lib/scraper/source";
 
 const directory = mkdtempSync(path.join(tmpdir(), "homework-unit-"));
@@ -124,6 +124,9 @@ test("message parser reads full content, attachment paths, unread state, and pag
     receivedAt: "2026-09-28 16:30:00",
     attachments: [{ name: "tvarkaraštis.pdf", sourcePath: "/1/lt/action/lostandfound/download_file/12/token" }],
   });
+  assert.equal(shouldImportMessage({ sourceId: "42", unread: true }, false), true);
+  assert.equal(shouldImportMessage({ sourceId: "43", unread: false }, false), false);
+  assert.equal(shouldImportMessage({ sourceId: "43", unread: false }, true), true);
 });
 
 test("messages and their attachment metadata are retained locally", () => {

@@ -6,11 +6,12 @@ import { CookieJar } from "./cookie-jar";
 import { fetchAssessmentsPage, fetchHomeworkPage, fetchMessageDetail, fetchMessagesPage, login } from "./source";
 import { parseHomework } from "./parse";
 import { assessmentDataRowCount, canReconcileAssessmentSchedule, hasAssessmentsTable, parseAssessments } from "./assessments";
-import { parseMessageDetail, parseMessageList } from "./messages";
+import { parseMessageDetail, parseMessageList, shouldImportMessage } from "./messages";
 import {
   createScrapeRun,
   deactivateAssessments,
   finishScrapeRun,
+  getMessageBySourceId,
   listUpcomingAssessments,
   upsertAssessmentItem,
   upsertHomeworkItem,
@@ -107,6 +108,7 @@ export async function runScrape(): Promise<ScrapeResult> {
       for (const listed of listedMessages) {
         if (seenMessageIds.has(listed.sourceId)) continue;
         seenMessageIds.add(listed.sourceId);
+        if (!shouldImportMessage(listed, Boolean(getMessageBySourceId(listed.sourceId)))) continue;
         try {
           const detail = parseMessageDetail(await fetchMessageDetail(jar, listed.sourceId), listed.sourceId);
           if (!detail) throw new Error("message detail could not be parsed");

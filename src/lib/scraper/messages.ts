@@ -13,6 +13,12 @@ export interface ParsedMessageDetail {
   attachments: Array<{ name: string; sourcePath: string }>;
 }
 
+// Historical source-read messages must not appear as new in a newly created
+// local inbox. Once we have a local copy, we may still refresh its metadata.
+export function shouldImportMessage(item: ParsedMessageListItem, hasLocalCopy: boolean): boolean {
+  return item.unread || hasLocalCopy;
+}
+
 function cleanText(el: { text: () => string }): string {
   return el.text().replace(/\s+/g, " ").trim();
 }
