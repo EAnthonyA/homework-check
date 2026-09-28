@@ -5,7 +5,7 @@ A small family app that keeps track of homework:
 - **Scrapes** an external school homework page (login + endpoints configured via env vars).
 - **Parses** homework, upcoming assessments, and messages.
 - **Shows** unfinished homework, including overdue work, to parents and kids.
-- **Lets the kid submit 1–3 photos** together for one Gemini verdict (done? correct?). Only an AI verdict that it is both done and correct, or a parent's action, marks the homework complete.
+- **Lets the kid submit 1–7 photos** together for one Gemini verdict (done? correct?). Only an AI verdict that it is both done and correct, or a parent's action, marks the homework complete.
 - **Keeps completion history** with the latest photos per kid, AI verdicts, and completion source. Parents can reopen work while preserving its evidence.
 
 ## Tech stack
@@ -20,7 +20,7 @@ A small family app that keeps track of homework:
 
 1. On schedule (or manually), the app logs in to the configured homework source,
    fetches the homework page and upserts parsed items into SQLite.
-2. Kids select or photograph 1–3 pages (up to 10 MB each), preview them, and submit
+2. Kids select or photograph 1–7 pages (up to 10 MB each), preview them, and submit
    all pages for one evaluation. The latest submission replaces the previous one
    for that kid and homework. Files live on local disk behind authenticated URLs.
 3. When `GEMINI_API_KEY` is set, Gemini evaluates all pages together. Only

@@ -34,7 +34,7 @@ legacy.close();
 const repo = await import("../src/lib/repo");
 const { getDb } = await import("../src/lib/db");
 const { submissionView } = await import("../src/lib/submission-view");
-const { validatePhotos, MAX_PHOTO_BYTES } = await import("../src/lib/upload-rules");
+const { validatePhotos, MAX_PHOTOS, MAX_PHOTO_BYTES } = await import("../src/lib/upload-rules");
 const { saveUpload, discardUnsavedUploads, purgeExpiredUploads, uploadDir } = await import("../src/lib/uploads");
 const { evaluateHomeworkImages } = await import("../src/lib/ai");
 
@@ -243,10 +243,10 @@ test("missing or failed AI evaluation saves photos without completing homework",
   }
 });
 
-test("photo rules accept 1–3 files and reject invalid sets before saving", async () => {
+test("photo rules accept 1–7 files and reject invalid sets before saving", async () => {
   const file = new File(["photo"], "photo.jpg", { type: "image/jpeg" });
-  for (const count of [1, 2, 3]) assert.doesNotThrow(() => validatePhotos(Array(count).fill(file)));
-  for (const files of [[], [file, file, file, file], [new File([], "empty.jpg", { type: "image/jpeg" })],
+  for (const count of Array.from({ length: MAX_PHOTOS }, (_, index) => index + 1)) assert.doesNotThrow(() => validatePhotos(Array(count).fill(file)));
+  for (const files of [[], Array(MAX_PHOTOS + 1).fill(file), [new File([], "empty.jpg", { type: "image/jpeg" })],
     [file, new File(["no"], "bad.txt", { type: "text/plain" })],
     [new File([new Uint8Array(MAX_PHOTO_BYTES + 1)], "big.jpg", { type: "image/jpeg" })]]) {
     assert.throws(() => validatePhotos(files));

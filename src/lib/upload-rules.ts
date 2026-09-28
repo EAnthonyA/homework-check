@@ -1,4 +1,4 @@
-export const MAX_PHOTOS = 3;
+export const MAX_PHOTOS = 7;
 export const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
 export const IMAGE_EXTENSIONS: Record<string, string> = {
   "image/jpeg": "jpg",
@@ -11,7 +11,7 @@ export const IMAGE_EXTENSIONS: Record<string, string> = {
 
 export function validatePhotos(files: readonly File[]): void {
   if (files.length < 1 || files.length > MAX_PHOTOS) {
-    throw new Error("Pasirink nuo 1 iki 3 nuotraukų.");
+    throw new Error(`Pasirink nuo 1 iki ${MAX_PHOTOS} nuotraukų.`);
   }
   for (const file of files) {
     if (!file.size) throw new Error("Nuotrauka tuščia. Pasirink kitą failą.");

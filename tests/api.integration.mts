@@ -75,13 +75,13 @@ test("authenticated upload, history and undo against the production server", { t
     assert.equal((await request("/api/homework/history", kid)).status, 403);
     assert.equal((await request("/api/upload", undefined, { method: "POST", body: photos(1) })).status, 401);
   });
-  await t.test("single-photo compatibility, three-photo replacement, and invalid-set rollback", async () => {
+  await t.test("single-photo compatibility, seven-photo replacement, and invalid-set rollback", async () => {
     const single = await request("/api/upload", kid, { method: "POST", body: photos(1) });
     assert.equal(single.status, 200);
-    const response = await request("/api/upload", kid, { method: "POST", body: photos(3) });
+    const response = await request("/api/upload", kid, { method: "POST", body: photos(7) });
     assert.equal(response.status, 200);
     const result = await response.json();
-    assert.equal(result.imagePaths.length, 3);
+    assert.equal(result.imagePaths.length, 7);
     assert.equal(result.imagePath, result.imagePaths[0]);
     assert.equal(result.completed, false);
     assert.equal(result.ai, null);
@@ -89,7 +89,7 @@ test("authenticated upload, history and undo against the production server", { t
     const uploadedImage = await request(result.imagePath, parent);
     assert.equal(uploadedImage.status, 200);
     assert.equal(uploadedImage.headers.get("cache-control"), "private, no-store");
-    for (const body of [photos(0), photos(4), photos(2, true)]) {
+    for (const body of [photos(0), photos(8), photos(2, true)]) {
       assert.equal((await request("/api/upload", kid, { method: "POST", body })).status, 400);
     }
     const today = await (await request("/api/homework/today", kid)).json();
@@ -102,7 +102,7 @@ test("authenticated upload, history and undo against the production server", { t
     const history = await (await request("/api/homework/history", parent)).json();
     assert.equal(history.items.length, 1);
     assert.equal(history.items[0].doneSource, "parent");
-    assert.equal(history.items[0].submissions[0].imagePaths.length, 3);
+    assert.equal(history.items[0].submissions[0].imagePaths.length, 7);
     assert.equal((await request("/api/upload", kid, { method: "POST", body: photos(1) })).status, 409);
     assert.equal((await (await request("/api/homework/today", kid)).json()).items.length, 0);
     for (let index = 0; index < 2; index++) {
@@ -114,7 +114,7 @@ test("authenticated upload, history and undo against the production server", { t
     for (const session of [parent, kid]) {
       const today = await (await request("/api/homework/today", session)).json();
       assert.equal(today.items[0].id, "overdue");
-      assert.equal(today.items[0].submissions[0].imagePaths.length, 3);
+      assert.equal(today.items[0].submissions[0].imagePaths.length, 7);
       assert.equal(today.items[0].mineDone, false);
     }
   });

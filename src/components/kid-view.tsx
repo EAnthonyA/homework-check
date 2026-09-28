@@ -33,7 +33,7 @@ export function KidView({ session }: { session: SessionProp }) {
         <p className="font-hand text-[1.35rem] leading-none text-pen-deep">{formatDateHuman(vilniusDateString())}</p>
         <h1 className="font-display mt-2 text-[2rem] font-black leading-[1.05] tracking-tight text-ink">Mano namų darbai</h1>
         <p className="mt-2.5 max-w-[38ch] text-[0.9375rem] leading-relaxed text-ink-soft">
-          Įkelk iki 3 nuotraukų, kai atliksi — visus puslapius įvertinsiu kartu.
+          Įkelk iki 7 nuotraukų, kai atliksi — visus puslapius įvertinsiu kartu.
         </p>
         {notice && <p role="status" className="mt-4 text-sm text-ink">{notice}</p>}
       </section>

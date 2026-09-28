@@ -4,6 +4,7 @@
 import { randomUUID } from "node:crypto";
 import type { StatementSync } from "node:sqlite";
 import { getDb } from "./db";
+import { MAX_PHOTOS } from "./upload-rules";
 
 export type Role = "parent" | "kid";
 
@@ -469,8 +470,8 @@ export function upsertSubmission(input: {
   aiError?: string | null;
   aiEvaluatedAt?: string | null;
 }): void {
-  if (input.imagePaths.length < 1 || input.imagePaths.length > 3) {
-    throw new Error("Expected 1–3 photos");
+  if (input.imagePaths.length < 1 || input.imagePaths.length > MAX_PHOTOS) {
+    throw new Error(`Expected 1–${MAX_PHOTOS} photos`);
   }
   stmt(UPSERT_SUBMISSION_SQL).run(
     newId(),
