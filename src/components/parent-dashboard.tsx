@@ -10,6 +10,7 @@ import { SubmissionEvidence } from "./submission-evidence";
 import { HomeworkSections } from "./homework-sections";
 import { AssessmentPreview } from "./assessment-preview";
 import { MessagesPanel } from "./messages-panel";
+import { ConsultationsPanel } from "./consultations-panel";
 import { DashboardTabs, SwipeableDashboardPanels, type DashboardTab } from "./dashboard-tabs";
 import type { SessionProp, TodayResponse } from "./types";
 
@@ -179,6 +180,15 @@ export function ParentDashboard({ session }: { session: SessionProp }) {
           className="mt-5"
         >
           <MessagesPanel />
+        </div>
+        <div
+          id="parent-dashboard-consultations-panel"
+          role="tabpanel"
+          aria-labelledby="parent-dashboard-consultations-tab"
+          hidden={activeTab !== "consultations"}
+          className="mt-5"
+        >
+          <ConsultationsPanel />
         </div>
         </SwipeableDashboardPanels>
       </div>
