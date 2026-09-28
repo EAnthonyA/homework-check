@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { useRef, type ReactNode, type TouchEvent } from "react";
+import { useEffect, useRef, type ReactNode, type TouchEvent } from "react";
 import type { AssessmentsResponse, MessagesResponse, TodayResponse } from "./types";
 
 export type DashboardTab = "homework" | "assessments" | "messages" | "consultations";
@@ -61,6 +61,7 @@ export function DashboardTabs({
   onChange: (tab: DashboardTab) => void;
   panelId: string;
 }) {
+  const tabRefs = useRef<Partial<Record<DashboardTab, HTMLButtonElement | null>>>({});
   const homework = useQuery<TodayResponse>({
     queryKey: ["homework", "today"],
     staleTime: 30_000,
@@ -99,6 +100,10 @@ export function DashboardTabs({
     { id: "consultations", label: "Konsultacijos", count: undefined },
   ];
 
+  useEffect(() => {
+    tabRefs.current[active]?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }, [active]);
+
   return (
     <div role="tablist" aria-label="Mokyklos informacija" className="flex gap-5 overflow-x-auto border-b border-rule">
       {tabs.map((tab) => {
@@ -106,6 +111,7 @@ export function DashboardTabs({
         return (
           <button
             key={tab.id}
+            ref={(element) => { tabRefs.current[tab.id] = element; }}
             id={`${panelId}-${tab.id}-tab`}
             type="button"
             role="tab"
