@@ -62,7 +62,7 @@ export function LearningFollowup({ homeworkId, submission }: { homeworkId: strin
       {help.error && <p role="alert" className="mt-2 text-sm text-pen-deep">{help.error.message}</p>}
       {guidance && (
         <div className="mt-3 rounded-lg bg-honey/10 p-3">
-          <p className="font-hand text-lg leading-none text-honey-deep">Užuomina, ne atsakymas</p>
+          <p className="font-hand text-lg leading-none text-honey-deep">Užuomina</p>
           <p className="mt-1.5 text-sm leading-relaxed text-ink">{guidance}</p>
         </div>
       )}

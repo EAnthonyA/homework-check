@@ -33,7 +33,7 @@ export async function POST(request: Request, ctx: RouteContext<"/api/homework/[i
   try {
     const parsed: unknown = JSON.parse(submission.ai_needs_work ?? "[]");
     needsWork = Array.isArray(parsed)
-      ? parsed.filter((part): part is string => typeof part === "string").map((part) => sanitizeFreeText(part, 300)).slice(0, 3)
+      ? parsed.filter((part): part is string => typeof part === "string").map((part) => sanitizeFreeText(part, 300)).slice(0, 20)
       : [];
   } catch {
     // The short AI summary still gives the tutor enough context for older submissions.

@@ -283,3 +283,22 @@ test("Gemini receives all pages in one request and returns one combined verdict"
   assert.equal(requests, 1);
   assert.deepEqual(verdict, { done: true, correct: false, summary: "Patikrink atsakymą.", goodParts: [], needsWork: [] });
 });
+
+test("Gemini retains individually labelled feedback for every visible task part", async (t) => {
+  process.env.GEMINI_API_KEY = "test-key";
+  const goodParts = Array.from({ length: 12 }, (_, index) => `${index + 1} — teisinga`);
+  const needsWork = Array.from({ length: 8 }, (_, index) => `${index + 13} — pasitikrink`);
+  t.mock.method(globalThis, "fetch", async () => Response.json({
+    candidates: [{ content: { parts: [{ text: JSON.stringify({ done: true, correct: false, summary: "Patikrink pažymėtas dalis.", goodParts, needsWork }) }] } }],
+  }));
+
+  const verdict = await evaluateHomeworkImages({
+    images: [{ imageBytes: new Uint8Array([1]), mimeType: "image/jpeg" }],
+    subject: "Istorija",
+    description: "Pratimai",
+    details: null,
+  });
+
+  assert.deepEqual(verdict.goodParts, goodParts);
+  assert.deepEqual(verdict.needsWork, needsWork);
+});
