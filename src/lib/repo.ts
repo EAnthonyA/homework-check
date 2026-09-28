@@ -54,6 +54,25 @@ export interface AssessmentRow {
   updated_at: string;
 }
 
+export interface MessageRow {
+  id: string;
+  source_id: string;
+  sender: string;
+  subject: string;
+  body: string;
+  received_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MessageAttachmentRow {
+  id: string;
+  message_id: string;
+  name: string;
+  source_path: string;
+  created_at: string;
+}
+
 export interface SubmissionWithUser {
   id: string;
   user_id: string;
@@ -340,6 +359,88 @@ export function listUpcomingAssessments(date: string): AssessmentRow[] {
   return stmt(
     "SELECT * FROM assessment_items WHERE active = 1 AND assessment_date >= ? ORDER BY assessment_date ASC, group_name ASC",
   ).all(date) as unknown as AssessmentRow[];
+}
+
+// ---------- Messages ----------
+
+export function getMessageBySourceId(sourceId: string): MessageRow | undefined {
+  return stmt("SELECT * FROM message_items WHERE source_id = ?").get(sourceId) as MessageRow | undefined;
+}
+
+export function getMessageById(id: string): MessageRow | undefined {
+  return stmt("SELECT * FROM message_items WHERE id = ?").get(id) as MessageRow | undefined;
+}
+
+export function listMessages(): MessageRow[] {
+  return stmt("SELECT * FROM message_items ORDER BY received_at DESC, created_at DESC").all() as unknown as MessageRow[];
+}
+
+export function listUnreadMessages(userId: string): MessageRow[] {
+  return stmt(`
+    SELECT m.*
+    FROM message_items m
+    LEFT JOIN message_reads r ON r.message_id = m.id AND r.user_id = ?
+    WHERE r.message_id IS NULL
+    ORDER BY m.received_at DESC, m.created_at DESC
+  `).all(userId) as unknown as MessageRow[];
+}
+
+export function markMessageRead(userId: string, messageId: string): void {
+  stmt("INSERT INTO message_reads (user_id, message_id) VALUES (?, ?) ON CONFLICT(user_id, message_id) DO NOTHING")
+    .run(userId, messageId);
+}
+
+export function listMessageAttachments(messageId: string): MessageAttachmentRow[] {
+  return stmt("SELECT * FROM message_attachments WHERE message_id = ? ORDER BY created_at ASC, name ASC").all(messageId) as unknown as MessageAttachmentRow[];
+}
+
+export function getMessageAttachment(messageId: string, attachmentId: string): MessageAttachmentRow | undefined {
+  return stmt("SELECT * FROM message_attachments WHERE message_id = ? AND id = ?").get(messageId, attachmentId) as MessageAttachmentRow | undefined;
+}
+
+const INSERT_MESSAGE_SQL = `
+  INSERT INTO message_items (id, source_id, sender, subject, body, received_at)
+  VALUES (?, ?, ?, ?, ?, ?)
+`;
+const UPDATE_MESSAGE_SQL = `
+  UPDATE message_items
+  SET sender = ?, subject = ?, body = ?, received_at = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
+  WHERE id = ?
+`;
+const UPSERT_MESSAGE_ATTACHMENT_SQL = `
+  INSERT INTO message_attachments (id, message_id, name, source_path)
+  VALUES (?, ?, ?, ?)
+  ON CONFLICT(message_id, source_path) DO UPDATE SET name = excluded.name
+`;
+
+export function upsertMessageItem(input: {
+  sourceId: string;
+  sender: string;
+  subject: string;
+  body: string;
+  receivedAt: string;
+  attachments: Array<{ name: string; sourcePath: string }>;
+}): { item: MessageRow; created: boolean; changed: boolean } {
+  const existing = getMessageBySourceId(input.sourceId);
+  let item: MessageRow;
+  let created = false;
+  let changed = false;
+  if (existing) {
+    changed = existing.sender !== input.sender || existing.subject !== input.subject ||
+      existing.body !== input.body || existing.received_at !== input.receivedAt;
+    if (changed) {
+      stmt(UPDATE_MESSAGE_SQL).run(input.sender, input.subject, input.body, input.receivedAt, existing.id);
+    }
+    item = getMessageBySourceId(input.sourceId)!;
+  } else {
+    stmt(INSERT_MESSAGE_SQL).run(newId(), input.sourceId, input.sender, input.subject, input.body, input.receivedAt);
+    item = getMessageBySourceId(input.sourceId)!;
+    created = true;
+  }
+  for (const attachment of input.attachments) {
+    stmt(UPSERT_MESSAGE_ATTACHMENT_SQL).run(newId(), item.id, attachment.name, attachment.sourcePath);
+  }
+  return { item, created, changed };
 }
 
 // ---------- Submissions ----------

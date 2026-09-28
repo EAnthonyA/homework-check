@@ -176,7 +176,7 @@ export function SettingsView({ session }: { session: SessionProp }) {
           <section className="sheet p-5 pl-10">
             <h2 className="font-display text-lg font-bold text-ink">Atnaujinti mokyklos duomenis</h2>
             <p className="mt-1 text-sm leading-relaxed text-ink-soft">
-              Paimk namų darbus ir artėjančius atsiskaitymus dabar arba palauk automatinio atnaujinimo 15:00.
+              Paimk namų darbus, artėjančius atsiskaitymus ir pranešimus dabar arba palauk automatinio atnaujinimo 15:00.
             </p>
             <button
               type="button"

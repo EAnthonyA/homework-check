@@ -8,6 +8,7 @@ import { SubmissionEvidence } from "./submission-evidence";
 import { PhotoSubmission } from "./photo-submission";
 import { HomeworkSections } from "./homework-sections";
 import { AssessmentPreview } from "./assessment-preview";
+import { MessagesPanel } from "./messages-panel";
 import { DashboardTabs, SwipeableDashboardPanels, type DashboardTab } from "./dashboard-tabs";
 import type { SessionProp, TodayResponse } from "./types";
 
@@ -89,6 +90,15 @@ export function KidView({ session }: { session: SessionProp }) {
           className="mt-5"
         >
           <AssessmentPreview audience="kid" />
+        </div>
+        <div
+          id="kid-dashboard-messages-panel"
+          role="tabpanel"
+          aria-labelledby="kid-dashboard-messages-tab"
+          hidden={activeTab !== "messages"}
+          className="mt-5"
+        >
+          <MessagesPanel />
         </div>
         </SwipeableDashboardPanels>
       </div>

@@ -2,9 +2,11 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useRef, type ReactNode, type TouchEvent } from "react";
-import type { AssessmentsResponse, TodayResponse } from "./types";
+import type { AssessmentsResponse, MessagesResponse, TodayResponse } from "./types";
 
-export type DashboardTab = "homework" | "assessments";
+export type DashboardTab = "homework" | "assessments" | "messages";
+
+const TAB_ORDER: DashboardTab[] = ["homework", "assessments", "messages"];
 
 export function SwipeableDashboardPanels({
   active,
@@ -33,8 +35,9 @@ export function SwipeableDashboardPanels({
     const horizontal = end.clientX - start.x;
     const vertical = end.clientY - start.y;
     if (Math.abs(horizontal) < 64 || Math.abs(horizontal) < Math.abs(vertical) * 1.5) return;
-    if (horizontal < 0 && active === "homework") onChange("assessments");
-    if (horizontal > 0 && active === "assessments") onChange("homework");
+    const current = TAB_ORDER.indexOf(active);
+    if (horizontal < 0 && current < TAB_ORDER.length - 1) onChange(TAB_ORDER[current + 1]);
+    if (horizontal > 0 && current > 0) onChange(TAB_ORDER[current - 1]);
   }
 
   return (
@@ -78,10 +81,21 @@ export function DashboardTabs({
       return response.json();
     },
   });
+  const messages = useQuery<MessagesResponse>({
+    queryKey: ["messages"],
+    staleTime: 30_000,
+    retry: 1,
+    queryFn: async () => {
+      const response = await fetch("/api/messages");
+      if (!response.ok) throw new Error("failed to load messages");
+      return response.json();
+    },
+  });
 
   const tabs: Array<{ id: DashboardTab; label: string; count: number | undefined }> = [
     { id: "homework", label: "Namų darbai", count: homework.data?.items.length },
     { id: "assessments", label: "Atsiskaitymai", count: assessments.data?.items.length },
+    { id: "messages", label: "Pranešimai", count: messages.data?.items.length },
   ];
 
   return (

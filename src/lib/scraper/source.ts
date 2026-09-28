@@ -36,6 +36,9 @@ const SEC_CH_UA_PLATFORM = env("HOMEWORK_SOURCE_PLATFORM") || '"macOS"';
 const ACCEPT_HTML =
   "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7";
 
+const DEFAULT_ASSESSMENTS_PAGE = "/l/lt/page/control_work/dates_pupil";
+const DEFAULT_MESSAGES_PAGE = "/1/lt/page/message_new/message_list";
+
 function clientHintHeaders(): Record<string, string> {
   return {
     "sec-ch-ua": SEC_CH_UA,
@@ -151,9 +154,13 @@ export async function login(jar: CookieJar): Promise<void> {
   jar.update(follow);
 }
 
-async function fetchPage(jar: CookieJar, pathName: string, label: string): Promise<string> {
-  const path = env(pathName);
+async function fetchPage(jar: CookieJar, pathName: string, label: string, defaultPath?: string): Promise<string> {
+  const path = env(pathName) || defaultPath;
   if (!path) throw new HomeworkSourceError(`${pathName} is not set`);
+  return fetchPath(jar, path, label);
+}
+
+async function fetchPath(jar: CookieJar, path: string, label: string): Promise<string> {
   const url = endpoint(path);
   const res = await fetch(url, {
     headers: { ...navHeaders("same-origin"), cookie: jar.header() },
@@ -170,10 +177,39 @@ export function fetchHomeworkPage(jar: CookieJar): Promise<string> {
   return fetchPage(jar, "HOMEWORK_SOURCE_HOMEWORK_PAGE", "Homework");
 }
 
-export function isAssessmentsPageConfigured(): boolean {
-  return Boolean(env("HOMEWORK_SOURCE_ASSESSMENTS_PAGE"));
+export function assessmentsPagePath(): string {
+  return env("HOMEWORK_SOURCE_ASSESSMENTS_PAGE") || DEFAULT_ASSESSMENTS_PAGE;
 }
 
 export function fetchAssessmentsPage(jar: CookieJar): Promise<string> {
-  return fetchPage(jar, "HOMEWORK_SOURCE_ASSESSMENTS_PAGE", "Assessments");
+  return fetchPage(jar, "HOMEWORK_SOURCE_ASSESSMENTS_PAGE", "Assessments", assessmentsPagePath());
+}
+
+export function messagesPagePath(): string {
+  return DEFAULT_MESSAGES_PAGE;
+}
+
+export function fetchMessagesPage(jar: CookieJar, pagePath = messagesPagePath()): Promise<string> {
+  if (!pagePath.startsWith(`${DEFAULT_MESSAGES_PAGE}/`) && pagePath !== DEFAULT_MESSAGES_PAGE) {
+    throw new HomeworkSourceError("Invalid messages page path");
+  }
+  return fetchPath(jar, pagePath, "Messages");
+}
+
+export function fetchMessageDetail(jar: CookieJar, sourceId: string): Promise<string> {
+  if (!/^\d+$/.test(sourceId)) throw new HomeworkSourceError("Invalid message ID");
+  return fetchPath(jar, `${DEFAULT_MESSAGES_PAGE.replace(/_list$/, "")}/${sourceId}`, "Message");
+}
+
+export async function fetchMessageAttachment(jar: CookieJar, sourcePath: string): Promise<Response> {
+  if (!sourcePath.startsWith("/1/lt/action/lostandfound/download_file/")) {
+    throw new HomeworkSourceError("Invalid message attachment path");
+  }
+  const response = await fetch(endpoint(sourcePath), {
+    headers: { ...navHeaders("same-origin"), cookie: jar.header() },
+    redirect: "manual",
+  });
+  jar.update(response);
+  if (response.status >= 400) throw new HomeworkSourceError(`Message attachment returned HTTP ${response.status}`);
+  return response;
 }
