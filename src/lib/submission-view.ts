@@ -13,7 +13,43 @@ function parseFeedbackParts(value: string | null): string[] {
   }
 }
 
-export function submissionView(s: SubmissionWithUser) {
+function parseDebug(value: string | null) {
+  if (!value) return null;
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (typeof parsed !== "object" || parsed === null) return null;
+    const debug = parsed as Record<string, unknown>;
+    const text = (item: unknown, maxLength = 400) => typeof item === "string" ? sanitizeFreeText(item, maxLength) : "";
+    const allowed = <T extends string>(item: unknown, values: readonly T[], fallback: T) =>
+      typeof item === "string" && values.includes(item as T) ? item as T : fallback;
+    const checks = Array.isArray(debug.checks) ? debug.checks.flatMap((item) => {
+      if (typeof item !== "object" || item === null) return [];
+      const check = item as Record<string, unknown>;
+      return [{
+        part: text(check.part, 100) || "numeris neįskaitomas",
+        verdict: allowed(check.verdict, ["correct", "incorrect", "unverifiable"] as const, "unverifiable"),
+        questionRead: text(check.questionRead) || "neįskaitoma",
+        answerRead: text(check.answerRead) || "neįskaitoma",
+        reason: text(check.reason) || "AI nepateikė priežasties.",
+      }];
+    }).slice(0, 20) : [];
+    const notes = Array.isArray(debug.notes)
+      ? debug.notes.filter((item): item is string => typeof item === "string").map((item) => sanitizeFreeText(item, 300)).filter(Boolean).slice(0, 10)
+      : [];
+    return {
+      model: text(debug.model, 200),
+      taskTextVisibility: allowed(debug.taskTextVisibility, ["clear", "partial", "missing", "unknown"] as const, "unknown"),
+      handwritingLegibility: allowed(debug.handwritingLegibility, ["clear", "mixed", "unclear", "unknown"] as const, "unknown"),
+      checks,
+      notes,
+      rawResponse: text(debug.rawResponse, 6_000),
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function submissionView(s: SubmissionWithUser, includeDebug = false) {
   return {
     userId: s.user_id,
     userName: sanitizeFreeText(s.user_name, 200),
@@ -26,6 +62,7 @@ export function submissionView(s: SubmissionWithUser) {
     aiSummary: s.ai_summary,
     aiGoodParts: parseFeedbackParts(s.ai_good_parts),
     aiNeedsWork: parseFeedbackParts(s.ai_needs_work),
+    aiDebug: includeDebug ? parseDebug(s.ai_debug) : null,
     aiError: s.ai_error,
     aiEvaluatedAt: s.ai_evaluated_at,
     learningReason: s.learning_reason,

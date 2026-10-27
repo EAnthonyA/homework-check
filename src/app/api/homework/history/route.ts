@@ -19,7 +19,7 @@ export async function GET() {
     doneDate: h.done_at ? vilniusDateString(new Date(h.done_at)) : h.due_date,
     doneByName: h.done_by_name ? sanitizeFreeText(h.done_by_name, 200) : null,
     doneSource: h.done_source,
-    submissions: listSubmissionsForHomework(h.id).map(submissionView),
+    submissions: listSubmissionsForHomework(h.id).map((submission) => submissionView(submission, true)),
   }));
 
   return NextResponse.json({ items });

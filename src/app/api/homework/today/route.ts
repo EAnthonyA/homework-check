@@ -20,7 +20,7 @@ export async function GET() {
       dueDate: h.due_date,
       details: h.details,
       mineDone: false,
-      submissions: submissions.map(submissionView),
+      submissions: submissions.map((submission) => submissionView(submission, session.role === "parent")),
     };
   });
 

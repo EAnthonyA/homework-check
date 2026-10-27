@@ -20,6 +20,20 @@ export interface SubmissionView {
   aiSummary: string | null;
   aiGoodParts: string[];
   aiNeedsWork: string[];
+  aiDebug: {
+    model: string;
+    taskTextVisibility: "clear" | "partial" | "missing" | "unknown";
+    handwritingLegibility: "clear" | "mixed" | "unclear" | "unknown";
+    checks: Array<{
+      part: string;
+      verdict: "correct" | "incorrect" | "unverifiable";
+      questionRead: string;
+      answerRead: string;
+      reason: string;
+    }>;
+    notes: string[];
+    rawResponse: string;
+  } | null;
   aiError: string | null;
   aiEvaluatedAt: string | null;
   learningReason: string | null;
