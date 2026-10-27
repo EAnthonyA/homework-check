@@ -28,6 +28,7 @@ export interface HomeworkEvaluationDebug {
     reason: string;
   }>;
   notes: string[];
+  verificationRawResponse?: string;
 }
 
 // Trusted directives only — the homework text and image are passed as opaque
@@ -66,8 +67,9 @@ function visionModel(): string {
   return process.env.GEMINI_VISION_MODEL ?? "gemini-2.5-flash";
 }
 
-function verifierModel(): string {
-  return process.env.GEMINI_VERIFIER_MODEL ?? "gemini-2.5-pro";
+function verifierModels(): string[] {
+  const configured = process.env.GEMINI_VERIFIER_MODEL?.trim();
+  return configured ? [configured] : ["gemini-3.8-flash", "gemini-2.5-pro"];
 }
 
 function imageResolution(): MediaResolution {
@@ -121,6 +123,7 @@ function parseDebug(value: unknown, rawResponse: string, model: string): Homewor
       reason: text(check.reason) || "AI nepateikė priežasties.",
     }];
   }).slice(0, 20) : [];
+  const hasNotes = Array.isArray(debug.notes);
   const notes = Array.isArray(debug.notes)
     ? debug.notes.filter((note): note is string => typeof note === "string").map((note) => sanitizeFreeText(note, 300)).filter(Boolean).slice(0, 10)
     : [];
@@ -130,7 +133,7 @@ function parseDebug(value: unknown, rawResponse: string, model: string): Homewor
     taskTextVisibility: visibility(debug.taskTextVisibility, ["clear", "partial", "missing"], "unknown") as HomeworkEvaluationDebug["taskTextVisibility"],
     handwritingLegibility: visibility(debug.handwritingLegibility, ["clear", "mixed", "unclear"], "unknown") as HomeworkEvaluationDebug["handwritingLegibility"],
     checks,
-    notes: notes.length ? notes : fallback.notes,
+    notes: hasNotes ? notes : fallback.notes,
   };
 }
 
@@ -247,8 +250,16 @@ export function evaluateHomeworkImages(input: HomeworkImagesInput): Promise<Home
 
 // Called only after the initial result is negative. It receives the original
 // evidence but not the first model's transcription, so it can catch OCR errors.
-export function verifyIncorrectHomeworkImages(input: HomeworkImagesInput): Promise<HomeworkEvaluation> {
-  return evaluateImages(input, verifierModel());
+export async function verifyIncorrectHomeworkImages(input: HomeworkImagesInput): Promise<HomeworkEvaluation> {
+  const failures: string[] = [];
+  for (const model of verifierModels()) {
+    try {
+      return await evaluateImages(input, model);
+    } catch (error) {
+      failures.push(`${model}: ${error instanceof Error ? error.message : "unknown error"}`);
+    }
+  }
+  throw new Error(failures.join("; "));
 }
 
 export async function createLearningGuidance(input: {
