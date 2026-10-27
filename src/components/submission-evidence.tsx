@@ -55,6 +55,11 @@ export function SubmissionEvidence({ submission }: { submission: SubmissionView 
       </div>
       <p className="mt-3 text-xs font-medium text-ink-soft">AI vertinimas</p>
       <AiVerdict submission={submission} />
+      {submission.manualTaskText && (
+        <p className="mt-3 border-l-2 border-honey/60 pl-3 text-sm leading-relaxed text-ink-soft">
+          Ranka patikslinta užduoties sąlyga: <span className="text-ink">{submission.manualTaskText}</span>
+        </p>
+      )}
       {submission.aiDone === null && !submission.aiError && (
         <p className="font-hand mt-1 text-xl text-slate">Neįvertinta · nuotraukas gali peržiūrėti tėvai.</p>
       )}

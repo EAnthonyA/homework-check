@@ -21,7 +21,7 @@ process.env.UPLOAD_DIR = path.join(directory, "uploads");
 
 // Start with the deployed single-image schema to exercise real startup migration.
 const legacy = new DatabaseSync(process.env.DB_PATH);
-legacy.exec(SCHEMA_SQL.replace("  image_paths TEXT,\n", "").replace("  ai_can_verify_correctness INTEGER,\n", "").replace("  ai_needs_clearer_photo INTEGER,\n", "").replace("  done_source TEXT,\n", "").replace("  completion_version INTEGER NOT NULL DEFAULT 0,\n", ""));
+legacy.exec(SCHEMA_SQL.replace("  image_paths TEXT,\n", "").replace("  ai_can_verify_correctness INTEGER,\n", "").replace("  ai_needs_clearer_photo INTEGER,\n", "").replace("  manual_task_text TEXT,\n", "").replace("  ai_used_manual_task INTEGER,\n", "").replace("  done_source TEXT,\n", "").replace("  completion_version INTEGER NOT NULL DEFAULT 0,\n", ""));
 legacy.exec(`
   INSERT INTO users (id, google_sub, email, name, role) VALUES ('kid', 'kid', 'kid@example.test', 'Vaikas', 'kid');
   INSERT INTO users (id, google_sub, email, name, role) VALUES ('parent', 'parent', 'parent@example.test', 'Tėvai', 'parent');
@@ -51,6 +51,7 @@ test("legacy photo migrates once, keeping unknown completion source neutral", ()
   const submission = repo.getSubmission("kid", "legacy")!;
   assert.deepEqual(submissionView(submission).imagePaths, ["/api/uploads/old.jpg"]);
   assert.equal(submission.ai_can_verify_correctness, null);
+  assert.equal(submission.manual_task_text, null);
   assert.equal(repo.getHomeworkById("legacy")!.done_source, null);
   execFileSync(process.execPath, ["--import", "tsx", "-e", "require('./src/lib/db.ts').getDb().close()"], { env: process.env });
   assert.equal(repo.getSubmission("kid", "legacy")!.image_paths, '["/api/uploads/old.jpg"]');
@@ -218,6 +219,18 @@ test("only a complete and correct AI verdict completes homework", () => {
   }, 0), true);
   assert.equal(repo.getHomeworkById(item.id)!.done_source, "ai");
   assert.ok(repo.listHomeworkHistory().some((entry) => entry.id === item.id));
+});
+
+test("a manually supplied task condition never auto-completes homework", () => {
+  const item = homework("manual-task");
+  assert.equal(repo.commitSubmission({
+    userId: "kid", homeworkId: item.id, imagePaths: ["/manual.jpg"], aiDone: true, aiCorrect: true,
+    manualTaskText: "(324 − 36) : a = 324 : a − 36 : 6", aiUsedManualTask: true,
+  }, 0), true);
+  const submission = repo.getSubmission("kid", item.id)!;
+  assert.equal(submission.manual_task_text, "(324 − 36) : a = 324 : a − 36 : 6");
+  assert.equal(submission.ai_used_manual_task, 1);
+  assert.equal(repo.getHomeworkById(item.id)!.done_at, null);
 });
 
 test("undo preserves evidence, restores overdue visibility, and is idempotent", () => {

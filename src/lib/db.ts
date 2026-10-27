@@ -54,6 +54,8 @@ function migrate(database: DatabaseSync): void {
   add("ai_good_parts", "ai_good_parts TEXT");
   add("ai_needs_work", "ai_needs_work TEXT");
   add("ai_debug", "ai_debug TEXT");
+  add("manual_task_text", "manual_task_text TEXT");
+  add("ai_used_manual_task", "ai_used_manual_task INTEGER");
   add("ai_error", "ai_error TEXT");
   add("ai_evaluated_at", "ai_evaluated_at TEXT");
   add("learning_reason", "learning_reason TEXT");

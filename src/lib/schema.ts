@@ -45,6 +45,8 @@ CREATE TABLE IF NOT EXISTS submissions (
   ai_good_parts TEXT,
   ai_needs_work TEXT,
   ai_debug TEXT,
+  manual_task_text TEXT,
+  ai_used_manual_task INTEGER,
   ai_error TEXT,
   ai_evaluated_at TEXT,
   learning_reason TEXT,

@@ -9,6 +9,7 @@ type Verdict =
   | { kind: "notDone" }
   | { kind: "needsTaskPhoto" }
   | { kind: "needsClearerPhoto" }
+  | { kind: "manualReview" }
   | { kind: "done"; correct: boolean | null };
 
 const styles = {
@@ -16,6 +17,7 @@ const styles = {
   notDone: { text: "text-pen-deep", mark: "mark-pen", label: "Neatlikta" },
   needsTaskPhoto: { text: "text-honey-deep", mark: "mark-honey", label: "Reikia užduočių" },
   needsClearerPhoto: { text: "text-honey-deep", mark: "mark-honey", label: "Reikia aiškesnės nuotraukos" },
+  manualReview: { text: "text-slate", mark: "mark-slate", label: "Reikia tėvų peržiūros" },
   wrong: { text: "text-honey-deep", mark: "mark-honey", label: "Reikia pataisyti" },
   right: { text: "text-leaf-deep", mark: "mark-leaf", label: "Atlikta ir teisinga" },
   done: { text: "text-slate", mark: "mark-slate", label: "Reikia peržiūros" },
@@ -25,6 +27,7 @@ function resolveVerdict(submission: SubmissionView): Verdict {
   if (submission.aiError) return { kind: "error" };
   if (submission.aiDone === null) return { kind: "none" };
   if (submission.aiDone === false) return { kind: "notDone" };
+  if (submission.aiUsedManualTask && submission.aiCorrect === true) return { kind: "manualReview" };
   if (submission.aiNeedsClearerPhoto) return { kind: "needsClearerPhoto" };
   if (submission.aiCanVerifyCorrectness === false) return { kind: "needsTaskPhoto" };
   return { kind: "done", correct: submission.aiCorrect };
@@ -35,6 +38,7 @@ function styleFor(v: Verdict) {
   if (v.kind === "notDone") return styles.notDone;
   if (v.kind === "needsTaskPhoto") return styles.needsTaskPhoto;
   if (v.kind === "needsClearerPhoto") return styles.needsClearerPhoto;
+  if (v.kind === "manualReview") return styles.manualReview;
   if (v.kind === "done" && v.correct === false) return styles.wrong;
   if (v.kind === "done" && v.correct === true) return styles.right;
   return styles.done;

@@ -11,6 +11,7 @@ import { AssessmentPreview } from "./assessment-preview";
 import { MessagesPanel } from "./messages-panel";
 import { ConsultationsPanel } from "./consultations-panel";
 import { LearningFollowup } from "./learning-followup";
+import { TaskTextCorrection } from "./task-text-correction";
 import { DashboardTabs, SwipeableDashboardPanels, type DashboardTab } from "./dashboard-tabs";
 import type { SessionProp, TodayResponse } from "./types";
 
@@ -76,7 +77,10 @@ export function KidView({ session }: { session: SessionProp }) {
               {mine && <div className="mt-4 border-t border-dashed border-rule pt-4">
                 <SubmissionEvidence submission={mine} />
                 {mine.aiDone && mine.aiCorrect === false && (
-                  <LearningFollowup homeworkId={item.id} submission={mine} />
+                  <>
+                    <TaskTextCorrection homeworkId={item.id} submission={mine} />
+                    <LearningFollowup homeworkId={item.id} submission={mine} />
+                  </>
                 )}
               </div>}
               <PhotoSubmission homeworkId={item.id} replacing={Boolean(mine)} onResult={setNotice} />
