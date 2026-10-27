@@ -44,7 +44,7 @@ export async function POST(request: Request) {
     }
 
     // Evaluate every page together as one submission.
-    let ai: { done: boolean; correct: boolean | null; canVerifyCorrectness: boolean; summary: string; goodParts: string[]; needsWork: string[] } | null = null;
+    let ai: { done: boolean; correct: boolean | null; canVerifyCorrectness: boolean; summary: string; goodParts: string[]; needsWork: string[]; debug: object } | null = null;
     let aiError: string | null = null;
     if (isAiConfigured()) {
       try {
@@ -74,6 +74,7 @@ export async function POST(request: Request) {
       aiSummary: ai?.summary ?? null,
       aiGoodParts: ai?.goodParts,
       aiNeedsWork: ai?.needsWork,
+      aiDebug: ai ? JSON.stringify(ai.debug) : null,
       aiError,
       aiEvaluatedAt,
     }, homework.completion_version);

@@ -11,6 +11,22 @@ export interface HomeworkEvaluation {
   summary: string;
   goodParts: string[];
   needsWork: string[];
+  debug: HomeworkEvaluationDebug;
+}
+
+export interface HomeworkEvaluationDebug {
+  model: string;
+  rawResponse: string;
+  taskTextVisibility: "clear" | "partial" | "missing" | "unknown";
+  handwritingLegibility: "clear" | "mixed" | "unclear" | "unknown";
+  checks: Array<{
+    part: string;
+    verdict: "correct" | "incorrect" | "unverifiable";
+    questionRead: string;
+    answerRead: string;
+    reason: string;
+  }>;
+  notes: string[];
 }
 
 // Trusted directives only — the homework text and image are passed as opaque
@@ -29,7 +45,8 @@ const SYSTEM_INSTRUCTION = [
   "summary: one short Lithuanian comment explaining the assessment. Do not use vague wording such as ‘many mistakes were made’.",
   "When task numbers or letters are readable, goodParts and needsWork must be exact lists of answers: begin every evaluated part with its identifier, for example ‘1 b) — teisinga’, ‘12 — teisinga’, or ‘14 — pasitikrink datą’. List ALL visible correct and incorrect parts, up to 20 entries in each list; do not group them by topic or use vague terms such as ‘most’ or ‘calculations’. If a number is unreadable, explicitly say ‘numeris neįskaitomas’ and never invent one.",
   "If correct is false, needsWork must contain every identified incorrect part. Never give the correct final answer, exact correction, or a completed solution; for each incorrect part, state only what the student should check.",
-  'Return ONLY valid JSON, without comments or code fences: {"done": true|false, "canVerifyCorrectness": true|false, "correct": true|false|null, "summary": "...", "goodParts": ["..."], "needsWork": ["..."]}',
+  "Include debug information for a parent-only audit trail. This must be a concise evidence record, not hidden chain-of-thought: state only what was visibly read and the direct reason for the verdict. In debug, taskTextVisibility is clear, partial, or missing; handwritingLegibility is clear, mixed, or unclear. Add one checks entry for each judged or unreadable part. Its questionRead and answerRead say what was read, or ‘neįskaitoma’; its reason is Lithuanian and must not reveal a correct answer. Use verdict correct, incorrect, or unverifiable. notes is a short Lithuanian list of remaining visibility issues.",
+  'Return ONLY valid JSON, without comments or code fences: {"done": true|false, "canVerifyCorrectness": true|false, "correct": true|false|null, "summary": "...", "goodParts": ["..."], "needsWork": ["..."], "debug":{"taskTextVisibility":"clear"|"partial"|"missing", "handwritingLegibility":"clear"|"mixed"|"unclear", "checks":[{"part":"...", "verdict":"correct"|"incorrect"|"unverifiable", "questionRead":"...", "answerRead":"...", "reason":"..."}], "notes":["..."]}}',
 ].join("\n");
 
 const TUTOR_SYSTEM_INSTRUCTION = [
@@ -67,7 +84,46 @@ function fixTrailingCommas(text: string): string {
   return text.replace(/,\s*([}\]])/g, "$1");
 }
 
-function parseEvaluation(text: string): HomeworkEvaluation {
+function parseDebug(value: unknown, rawResponse: string, model: string): HomeworkEvaluationDebug {
+  const fallback: HomeworkEvaluationDebug = {
+    model,
+    rawResponse: sanitizeFreeText(rawResponse, 6_000),
+    taskTextVisibility: "unknown",
+    handwritingLegibility: "unknown",
+    checks: [],
+    notes: ["AI nepateikė vertinimo detalių."],
+  };
+  if (typeof value !== "object" || value === null) return fallback;
+  const debug = value as Record<string, unknown>;
+  const visibility = (value: unknown, allowed: readonly string[], fallbackValue: string) =>
+    typeof value === "string" && allowed.includes(value) ? value : fallbackValue;
+  const text = (value: unknown, maxLength = 400) => typeof value === "string" ? sanitizeFreeText(value, maxLength) : "";
+  const checks = Array.isArray(debug.checks) ? debug.checks.flatMap((entry) => {
+    if (typeof entry !== "object" || entry === null) return [];
+    const check = entry as Record<string, unknown>;
+    const verdict = visibility(check.verdict, ["correct", "incorrect", "unverifiable"], "unverifiable") as HomeworkEvaluationDebug["checks"][number]["verdict"];
+    return [{
+      part: text(check.part, 100) || "numeris neįskaitomas",
+      verdict,
+      questionRead: text(check.questionRead) || "neįskaitoma",
+      answerRead: text(check.answerRead) || "neįskaitoma",
+      reason: text(check.reason) || "AI nepateikė priežasties.",
+    }];
+  }).slice(0, 20) : [];
+  const notes = Array.isArray(debug.notes)
+    ? debug.notes.filter((note): note is string => typeof note === "string").map((note) => sanitizeFreeText(note, 300)).filter(Boolean).slice(0, 10)
+    : [];
+  return {
+    model,
+    rawResponse: sanitizeFreeText(rawResponse, 6_000),
+    taskTextVisibility: visibility(debug.taskTextVisibility, ["clear", "partial", "missing"], "unknown") as HomeworkEvaluationDebug["taskTextVisibility"],
+    handwritingLegibility: visibility(debug.handwritingLegibility, ["clear", "mixed", "unclear"], "unknown") as HomeworkEvaluationDebug["handwritingLegibility"],
+    checks,
+    notes: notes.length ? notes : fallback.notes,
+  };
+}
+
+function parseEvaluation(text: string, model: string): HomeworkEvaluation {
   const cleaned = stripCodeFences(text);
   let parsed: unknown;
   try {
@@ -85,6 +141,7 @@ function parseEvaluation(text: string): HomeworkEvaluation {
   // Missing evidence is deliberately treated as unsafe. This protects against
   // model versions that omit the new field instead of guessing from an answer.
   const canVerifyCorrectness = obj.canVerifyCorrectness === true;
+  const debug = parseDebug(obj.debug, text, model);
   if (!canVerifyCorrectness) {
     return {
       done: obj.done === true,
@@ -93,6 +150,7 @@ function parseEvaluation(text: string): HomeworkEvaluation {
       summary: "Kad galėčiau patikrinti atsakymus, įkelk aiškią užduočių puslapio nuotrauką, kur matosi klausimai ir visi skaičiai.",
       goodParts: [],
       needsWork: [],
+      debug,
     };
   }
   return {
@@ -103,6 +161,7 @@ function parseEvaluation(text: string): HomeworkEvaluation {
       typeof obj.summary === "string" ? sanitizeFreeText(obj.summary, 500) : "",
     goodParts: parts(obj.goodParts),
     needsWork: parts(obj.needsWork),
+    debug,
   };
 }
 
@@ -127,8 +186,9 @@ export async function evaluateHomeworkImages(input: {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 30_000);
   try {
+    const model = visionModel();
     const response = await client().models.generateContent({
-      model: visionModel(),
+      model,
       contents: [
         {
           role: "user",
@@ -155,7 +215,7 @@ export async function evaluateHomeworkImages(input: {
     if (!text) {
       throw new Error("Gemini returned no text");
     }
-    return parseEvaluation(text);
+    return parseEvaluation(text, model);
   } catch (err) {
     if (err instanceof Error && err.name === "AbortError") {
       throw new Error("AI evaluation timed out");

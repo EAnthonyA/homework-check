@@ -187,12 +187,24 @@ test("an incorrect AI verdict keeps the latest photo set active for correction",
   const item = homework("replace");
   const first = { userId: "kid", homeworkId: item.id, imagePaths: ["/a.jpg"], aiDone: false };
   assert.equal(repo.commitSubmission(first, 0), true);
-  assert.equal(repo.commitSubmission({ ...first, imagePaths: ["/b.jpg", "/c.jpg", "/d.jpg"], aiDone: true, aiCorrect: false, aiSummary: "Yra klaidų" }, 0), true);
+  const aiDebug = JSON.stringify({
+    model: "gemini-2.5-flash",
+    taskTextVisibility: "clear",
+    handwritingLegibility: "mixed",
+    checks: [{ part: "U209 b)", verdict: "incorrect", questionRead: "(324 − 36) : a", answerRead: "6", reason: "AI užfiksavo neatitikimą; peržiūrėk nuotrauką." }],
+    notes: ["Vienas skaičius gali būti neaiškiai įskaitomas."],
+    rawResponse: "{...}",
+  });
+  assert.equal(repo.commitSubmission({ ...first, imagePaths: ["/b.jpg", "/c.jpg", "/d.jpg"], aiDone: true, aiCorrect: false, aiSummary: "Yra klaidų", aiDebug }, 0), true);
   const saved = submissionView(repo.getSubmission("kid", item.id)!);
   assert.deepEqual(saved.imagePaths, ["/b.jpg", "/c.jpg", "/d.jpg"]);
   assert.equal(saved.imagePath, "/b.jpg");
   assert.equal(saved.aiCorrect, false);
   assert.equal(saved.aiCanVerifyCorrectness, null);
+  assert.equal(saved.aiDebug, null);
+  const parentView = submissionView(repo.getSubmission("kid", item.id)!, true);
+  assert.equal(parentView.aiDebug?.handwritingLegibility, "mixed");
+  assert.equal(parentView.aiDebug?.checks[0]?.answerRead, "6");
   assert.equal(repo.listSubmissionsForHomework(item.id).length, 1);
   assert.equal(repo.getHomeworkById(item.id)!.done_source, null);
   assert.equal(repo.getHomeworkById(item.id)!.done_at, null);
@@ -284,7 +296,14 @@ test("Gemini receives all pages in one request and returns one combined verdict"
   });
   const verdict = await evaluateHomeworkImages({ images: [1, 2, 3].map((n) => ({ imageBytes: new Uint8Array([n]), mimeType: "image/jpeg" })), subject: "Matematika", description: "Trys puslapiai", details: null });
   assert.equal(requests, 1);
-  assert.deepEqual(verdict, { done: true, correct: false, canVerifyCorrectness: true, summary: "Patikrink atsakymą.", goodParts: [], needsWork: [] });
+  assert.equal(verdict.done, true);
+  assert.equal(verdict.correct, false);
+  assert.equal(verdict.canVerifyCorrectness, true);
+  assert.equal(verdict.summary, "Patikrink atsakymą.");
+  assert.deepEqual(verdict.goodParts, []);
+  assert.deepEqual(verdict.needsWork, []);
+  assert.equal(verdict.debug.model, "gemini-2.5-flash");
+  assert.equal(verdict.debug.handwritingLegibility, "unknown");
 });
 
 test("Gemini retains individually labelled feedback for every visible task part", async (t) => {
@@ -324,7 +343,8 @@ test("AI refuses to judge answers when the task evidence is missing or omitted",
     details: null,
   });
 
-  assert.deepEqual(verdict, {
+  const { debug, ...result } = verdict;
+  assert.deepEqual(result, {
     done: true,
     correct: null,
     canVerifyCorrectness: false,
@@ -332,4 +352,6 @@ test("AI refuses to judge answers when the task evidence is missing or omitted",
     goodParts: [],
     needsWork: [],
   });
+  assert.equal(debug.taskTextVisibility, "unknown");
+  assert.match(debug.rawResponse, /Atrodo gerai/);
 });
