@@ -80,6 +80,7 @@ export interface SubmissionWithUser {
   note: string | null;
   ai_done: number | null;
   ai_correct: number | null;
+  ai_can_verify_correctness: number | null;
   ai_summary: string | null;
   ai_good_parts: string | null;
   ai_needs_work: string | null;
@@ -437,16 +438,17 @@ export function upsertMessageItem(input: {
 const UPSERT_SUBMISSION_SQL = `
   INSERT INTO submissions (
     id, user_id, homework_id, image_path, image_paths, note,
-    ai_done, ai_correct, ai_summary, ai_good_parts, ai_needs_work, ai_error, ai_evaluated_at,
+    ai_done, ai_correct, ai_can_verify_correctness, ai_summary, ai_good_parts, ai_needs_work, ai_error, ai_evaluated_at,
     learning_reason, learning_question, learning_guidance
   )
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   ON CONFLICT(user_id, homework_id) DO UPDATE SET
     image_path = excluded.image_path,
     image_paths = excluded.image_paths,
     note = excluded.note,
     ai_done = excluded.ai_done,
     ai_correct = excluded.ai_correct,
+    ai_can_verify_correctness = excluded.ai_can_verify_correctness,
     ai_summary = excluded.ai_summary,
     ai_good_parts = excluded.ai_good_parts,
     ai_needs_work = excluded.ai_needs_work,
@@ -464,6 +466,7 @@ export function upsertSubmission(input: {
   note?: string | null;
   aiDone?: boolean | null;
   aiCorrect?: boolean | null;
+  aiCanVerifyCorrectness?: boolean | null;
   aiSummary?: string | null;
   aiGoodParts?: string[];
   aiNeedsWork?: string[];
@@ -482,6 +485,7 @@ export function upsertSubmission(input: {
     input.note ?? null,
     input.aiDone == null ? null : input.aiDone ? 1 : 0,
     input.aiCorrect == null ? null : input.aiCorrect ? 1 : 0,
+    input.aiCanVerifyCorrectness == null ? null : input.aiCanVerifyCorrectness ? 1 : 0,
     input.aiSummary ?? null,
     input.aiGoodParts ? JSON.stringify(input.aiGoodParts) : null,
     input.aiNeedsWork ? JSON.stringify(input.aiNeedsWork) : null,

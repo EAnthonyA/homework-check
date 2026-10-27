@@ -22,6 +22,7 @@ export function submissionView(s: SubmissionWithUser) {
     createdAt: s.created_at,
     aiDone: s.ai_done === null ? null : s.ai_done === 1,
     aiCorrect: s.ai_correct === null ? null : s.ai_correct === 1,
+    aiCanVerifyCorrectness: s.ai_can_verify_correctness === null ? null : s.ai_can_verify_correctness === 1,
     aiSummary: s.ai_summary,
     aiGoodParts: parseFeedbackParts(s.ai_good_parts),
     aiNeedsWork: parseFeedbackParts(s.ai_needs_work),

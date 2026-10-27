@@ -21,7 +21,7 @@ process.env.UPLOAD_DIR = path.join(directory, "uploads");
 
 // Start with the deployed single-image schema to exercise real startup migration.
 const legacy = new DatabaseSync(process.env.DB_PATH);
-legacy.exec(SCHEMA_SQL.replace("  image_paths TEXT,\n", "").replace("  done_source TEXT,\n", "").replace("  completion_version INTEGER NOT NULL DEFAULT 0,\n", ""));
+legacy.exec(SCHEMA_SQL.replace("  image_paths TEXT,\n", "").replace("  ai_can_verify_correctness INTEGER,\n", "").replace("  done_source TEXT,\n", "").replace("  completion_version INTEGER NOT NULL DEFAULT 0,\n", ""));
 legacy.exec(`
   INSERT INTO users (id, google_sub, email, name, role) VALUES ('kid', 'kid', 'kid@example.test', 'Vaikas', 'kid');
   INSERT INTO users (id, google_sub, email, name, role) VALUES ('parent', 'parent', 'parent@example.test', 'Tėvai', 'parent');
@@ -48,7 +48,9 @@ function homework(sourceId: string, dueDate = "2020-01-01") {
 }
 
 test("legacy photo migrates once, keeping unknown completion source neutral", () => {
-  assert.deepEqual(submissionView(repo.getSubmission("kid", "legacy")!).imagePaths, ["/api/uploads/old.jpg"]);
+  const submission = repo.getSubmission("kid", "legacy")!;
+  assert.deepEqual(submissionView(submission).imagePaths, ["/api/uploads/old.jpg"]);
+  assert.equal(submission.ai_can_verify_correctness, null);
   assert.equal(repo.getHomeworkById("legacy")!.done_source, null);
   execFileSync(process.execPath, ["--import", "tsx", "-e", "require('./src/lib/db.ts').getDb().close()"], { env: process.env });
   assert.equal(repo.getSubmission("kid", "legacy")!.image_paths, '["/api/uploads/old.jpg"]');
@@ -190,6 +192,7 @@ test("an incorrect AI verdict keeps the latest photo set active for correction",
   assert.deepEqual(saved.imagePaths, ["/b.jpg", "/c.jpg", "/d.jpg"]);
   assert.equal(saved.imagePath, "/b.jpg");
   assert.equal(saved.aiCorrect, false);
+  assert.equal(saved.aiCanVerifyCorrectness, null);
   assert.equal(repo.listSubmissionsForHomework(item.id).length, 1);
   assert.equal(repo.getHomeworkById(item.id)!.done_source, null);
   assert.equal(repo.getHomeworkById(item.id)!.done_at, null);
@@ -277,11 +280,11 @@ test("Gemini receives all pages in one request and returns one combined verdict"
     const images = body.contents[0].parts.filter((part: { inlineData?: unknown }) => part.inlineData);
     assert.equal(images.length, 3);
     assert.deepEqual(images.map((part: { inlineData: { data: string } }) => part.inlineData.data), ["AQ==", "Ag==", "Aw=="]);
-    return Response.json({ candidates: [{ content: { parts: [{ text: '{"done":true,"correct":false,"summary":"Patikrink atsakymą."}' }] } }] });
+    return Response.json({ candidates: [{ content: { parts: [{ text: '{"done":true,"canVerifyCorrectness":true,"correct":false,"summary":"Patikrink atsakymą."}' }] } }] });
   });
   const verdict = await evaluateHomeworkImages({ images: [1, 2, 3].map((n) => ({ imageBytes: new Uint8Array([n]), mimeType: "image/jpeg" })), subject: "Matematika", description: "Trys puslapiai", details: null });
   assert.equal(requests, 1);
-  assert.deepEqual(verdict, { done: true, correct: false, summary: "Patikrink atsakymą.", goodParts: [], needsWork: [] });
+  assert.deepEqual(verdict, { done: true, correct: false, canVerifyCorrectness: true, summary: "Patikrink atsakymą.", goodParts: [], needsWork: [] });
 });
 
 test("Gemini retains individually labelled feedback for every visible task part", async (t) => {
@@ -289,7 +292,7 @@ test("Gemini retains individually labelled feedback for every visible task part"
   const goodParts = Array.from({ length: 12 }, (_, index) => `${index + 1} — teisinga`);
   const needsWork = Array.from({ length: 8 }, (_, index) => `${index + 13} — pasitikrink`);
   t.mock.method(globalThis, "fetch", async () => Response.json({
-    candidates: [{ content: { parts: [{ text: JSON.stringify({ done: true, correct: false, summary: "Patikrink pažymėtas dalis.", goodParts, needsWork }) }] } }],
+    candidates: [{ content: { parts: [{ text: JSON.stringify({ done: true, canVerifyCorrectness: true, correct: false, summary: "Patikrink pažymėtas dalis.", goodParts, needsWork }) }] } }],
   }));
 
   const verdict = await evaluateHomeworkImages({
@@ -301,4 +304,32 @@ test("Gemini retains individually labelled feedback for every visible task part"
 
   assert.deepEqual(verdict.goodParts, goodParts);
   assert.deepEqual(verdict.needsWork, needsWork);
+});
+
+test("AI refuses to judge answers when the task evidence is missing or omitted", async (t) => {
+  process.env.GEMINI_API_KEY = "test-key";
+  t.mock.method(globalThis, "fetch", async () => Response.json({
+    candidates: [{ content: { parts: [{ text: JSON.stringify({
+      done: true,
+      correct: true,
+      summary: "Atrodo gerai.",
+      goodParts: ["U209 — teisinga"],
+    }) }] } }],
+  }));
+
+  const verdict = await evaluateHomeworkImages({
+    images: [{ imageBytes: new Uint8Array([1]), mimeType: "image/jpeg" }],
+    subject: "Matematika",
+    description: "U209–U211",
+    details: null,
+  });
+
+  assert.deepEqual(verdict, {
+    done: true,
+    correct: null,
+    canVerifyCorrectness: false,
+    summary: "Kad galėčiau patikrinti atsakymus, įkelk aiškią užduočių puslapio nuotrauką, kur matosi klausimai ir visi skaičiai.",
+    goodParts: [],
+    needsWork: [],
+  });
 });
