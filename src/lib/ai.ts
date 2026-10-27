@@ -69,7 +69,7 @@ function visionModel(): string {
 
 function verifierModels(): string[] {
   const configured = process.env.GEMINI_VERIFIER_MODEL?.trim();
-  return configured ? [configured] : ["gemini-3.8-flash", "gemini-2.5-pro"];
+  return configured ? [configured] : ["gemini-3.8-flash", "gemini-3.1-pro-preview"];
 }
 
 function imageResolution(): MediaResolution {
@@ -189,7 +189,7 @@ type HomeworkImagesInput = {
   manualTaskText?: string | null;
 };
 
-async function evaluateImages(input: HomeworkImagesInput, model: string): Promise<HomeworkEvaluation> {
+async function evaluateImages(input: HomeworkImagesInput, model: string, timeoutMs = 30_000): Promise<HomeworkEvaluation> {
   const subject = sanitizeFreeText(input.subject, 200);
   const description = sanitizeFreeText(input.description, 2000);
   const details = input.details ? sanitizeFreeText(input.details, 2000) : "";
@@ -205,7 +205,7 @@ async function evaluateImages(input: HomeworkImagesInput, model: string): Promis
     .join("\n");
 
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 30_000);
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await client().models.generateContent({
       model,
@@ -257,7 +257,9 @@ export async function verifyIncorrectHomeworkImages(input: HomeworkImagesInput):
   const failures: string[] = [];
   for (const model of verifierModels()) {
     try {
-      return await evaluateImages(input, model);
+      // The independent verifier may use a reasoning model, which needs more
+      // time than the initial Flash pass to inspect the same photos.
+      return await evaluateImages(input, model, 60_000);
     } catch (error) {
       failures.push(`${model}: ${error instanceof Error ? error.message : "unknown error"}`);
     }

@@ -349,6 +349,25 @@ test("negative-verdict verifier uses its configured model and high image detail"
   delete process.env.GEMINI_VERIFIER_MODEL;
 });
 
+test("negative-verdict verifier falls back from Flash to the supported Pro model", async (t) => {
+  process.env.GEMINI_API_KEY = "test-key";
+  delete process.env.GEMINI_VERIFIER_MODEL;
+  const models: string[] = [];
+  t.mock.method(globalThis, "fetch", async (url: unknown) => {
+    const model = String(url).match(/models\/([^:]+)/)?.[1] ?? "";
+    models.push(model);
+    if (model === "gemini-3.8-flash") {
+      return Response.json({ error: { message: "temporarily unavailable" } }, { status: 503 });
+    }
+    return Response.json({ candidates: [{ content: { parts: [{ text: '{"done":true,"canVerifyCorrectness":true,"correct":false,"summary":"Patikrink."}' }] } }] });
+  });
+  const verdict = await verifyIncorrectHomeworkImages({
+    images: [{ imageBytes: new Uint8Array([1]), mimeType: "image/jpeg" }], subject: "Matematika", description: "U209", details: null,
+  });
+  assert.deepEqual(models, ["gemini-3.8-flash", "gemini-3.1-pro-preview"]);
+  assert.equal(verdict.debug.model, "gemini-3.1-pro-preview");
+});
+
 test("manual task text reaches AI intact even when homework details are present", async (t) => {
   process.env.GEMINI_API_KEY = "test-key";
   const manualTaskText = "a".repeat(2_000);
