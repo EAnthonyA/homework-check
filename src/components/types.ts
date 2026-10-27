@@ -34,6 +34,7 @@ export interface SubmissionView {
     }>;
     notes: string[];
     rawResponse: string;
+    verificationRawResponse: string;
   } | null;
   aiError: string | null;
   aiEvaluatedAt: string | null;

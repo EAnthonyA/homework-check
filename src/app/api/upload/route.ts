@@ -81,15 +81,19 @@ export async function POST(request: Request) {
           try {
             const verification = await verifyIncorrectHomeworkImages(evaluationInput);
             if (!(verification.done && verification.canVerifyCorrectness && verification.correct === false && sameIncorrectParts(ai, verification))) {
+              const verifierCouldRead = verification.done && verification.canVerifyCorrectness && verification.correct !== null;
               ai = {
                 ...ai,
                 correct: null,
-                needsClearerPhoto: true,
-                summary: "Negaliu patikimai patvirtinti klaidos — įkelk tiesią, stambią užduoties nuotrauką, kad aiškiai matytųsi visi skaičiai ir raidės.",
+                needsClearerPhoto: !verifierCouldRead,
+                summary: verifierCouldRead
+                  ? "Du nepriklausomi AI vertinimai nesutapo. Nuotraukos išsaugotos tėvų peržiūrai — vaiko taisyti neprašoma."
+                  : "Negaliu patikimai patvirtinti klaidos — įkelk tiesią, stambią užduoties nuotrauką, kad aiškiai matytųsi visi skaičiai ir raidės.",
                 goodParts: [],
                 needsWork: [],
                 debug: {
                   ...ai.debug,
+                  verificationRawResponse: verification.debug.rawResponse,
                   notes: [...ai.debug.notes, `Pakartotinis patikrinimas (${verification.debug.model}) nepatvirtino tų pačių klaidų.`].slice(0, 10),
                 },
               };
@@ -105,7 +109,7 @@ export async function POST(request: Request) {
               needsWork: [],
               debug: {
                 ...ai.debug,
-                notes: [...ai.debug.notes, "Pakartotinis AI patikrinimas nepasiekiamas."].slice(0, 10),
+                notes: [...ai.debug.notes, `Pakartotinis AI patikrinimas nepasiekiamas: ${error instanceof Error ? error.message : "nežinoma klaida"}`].slice(0, 10),
               },
             };
           }

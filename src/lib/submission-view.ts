@@ -43,6 +43,7 @@ function parseDebug(value: string | null) {
       checks,
       notes,
       rawResponse: text(debug.rawResponse, 6_000),
+      verificationRawResponse: text(debug.verificationRawResponse, 6_000),
     };
   } catch {
     return null;

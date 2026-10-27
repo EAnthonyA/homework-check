@@ -90,6 +90,12 @@ export function SubmissionEvidence({ submission }: { submission: SubmissionView 
                 <p className="mt-1 break-words font-mono leading-relaxed">{submission.aiDebug.rawResponse}</p>
               </details>
             )}
+            {submission.aiDebug.verificationRawResponse && (
+              <details className="text-xs text-ink-faint">
+                <summary className="cursor-pointer">Žalias pakartotinio tikrinimo atsakymas</summary>
+                <p className="mt-1 break-words font-mono leading-relaxed">{submission.aiDebug.verificationRawResponse}</p>
+              </details>
+            )}
           </div>
         </details>
       )}

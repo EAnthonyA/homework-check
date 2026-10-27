@@ -320,6 +320,7 @@ test("negative-verdict verifier uses its configured model and high image detail"
   });
   assert.equal(verdict.debug.model, "test-verifier");
   assert.equal(verdict.debug.checks[0]?.part, "U209 b)");
+  assert.deepEqual(verdict.debug.notes, []);
   delete process.env.GEMINI_VERIFIER_MODEL;
 });
 
