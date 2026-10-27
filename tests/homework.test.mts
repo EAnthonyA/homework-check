@@ -21,7 +21,7 @@ process.env.UPLOAD_DIR = path.join(directory, "uploads");
 
 // Start with the deployed single-image schema to exercise real startup migration.
 const legacy = new DatabaseSync(process.env.DB_PATH);
-legacy.exec(SCHEMA_SQL.replace("  image_paths TEXT,\n", "").replace("  ai_can_verify_correctness INTEGER,\n", "").replace("  done_source TEXT,\n", "").replace("  completion_version INTEGER NOT NULL DEFAULT 0,\n", ""));
+legacy.exec(SCHEMA_SQL.replace("  image_paths TEXT,\n", "").replace("  ai_can_verify_correctness INTEGER,\n", "").replace("  ai_needs_clearer_photo INTEGER,\n", "").replace("  done_source TEXT,\n", "").replace("  completion_version INTEGER NOT NULL DEFAULT 0,\n", ""));
 legacy.exec(`
   INSERT INTO users (id, google_sub, email, name, role) VALUES ('kid', 'kid', 'kid@example.test', 'Vaikas', 'kid');
   INSERT INTO users (id, google_sub, email, name, role) VALUES ('parent', 'parent', 'parent@example.test', 'Tėvai', 'parent');
@@ -36,7 +36,7 @@ const { getDb } = await import("../src/lib/db");
 const { submissionView } = await import("../src/lib/submission-view");
 const { validatePhotos, MAX_PHOTOS, MAX_PHOTO_BYTES } = await import("../src/lib/upload-rules");
 const { saveUpload, discardUnsavedUploads, purgeExpiredUploads, uploadDir } = await import("../src/lib/uploads");
-const { evaluateHomeworkImages } = await import("../src/lib/ai");
+const { evaluateHomeworkImages, verifyIncorrectHomeworkImages } = await import("../src/lib/ai");
 
 after(() => {
   getDb().close();
@@ -292,6 +292,7 @@ test("Gemini receives all pages in one request and returns one combined verdict"
     const images = body.contents[0].parts.filter((part: { inlineData?: unknown }) => part.inlineData);
     assert.equal(images.length, 3);
     assert.deepEqual(images.map((part: { inlineData: { data: string } }) => part.inlineData.data), ["AQ==", "Ag==", "Aw=="]);
+    assert.match(String(init.body), /mediaResolution/);
     return Response.json({ candidates: [{ content: { parts: [{ text: '{"done":true,"canVerifyCorrectness":true,"correct":false,"summary":"Patikrink atsakymą."}' }] } }] });
   });
   const verdict = await evaluateHomeworkImages({ images: [1, 2, 3].map((n) => ({ imageBytes: new Uint8Array([n]), mimeType: "image/jpeg" })), subject: "Matematika", description: "Trys puslapiai", details: null });
@@ -304,6 +305,22 @@ test("Gemini receives all pages in one request and returns one combined verdict"
   assert.deepEqual(verdict.needsWork, []);
   assert.equal(verdict.debug.model, "gemini-2.5-flash");
   assert.equal(verdict.debug.handwritingLegibility, "unknown");
+});
+
+test("negative-verdict verifier uses its configured model and high image detail", async (t) => {
+  process.env.GEMINI_API_KEY = "test-key";
+  process.env.GEMINI_VERIFIER_MODEL = "test-verifier";
+  t.mock.method(globalThis, "fetch", async (url: unknown, init: RequestInit) => {
+    assert.match(String(url), /test-verifier/);
+    assert.match(String(init.body), /mediaResolution/);
+    return Response.json({ candidates: [{ content: { parts: [{ text: JSON.stringify({ done: true, canVerifyCorrectness: true, correct: false, summary: "Patikrink.", debug: { taskTextVisibility: "clear", handwritingLegibility: "clear", checks: [{ part: "U209 b)", verdict: "incorrect", questionRead: "sąlyga", answerRead: "6", reason: "neatitinka" }], notes: [] } }) }] } }] });
+  });
+  const verdict = await verifyIncorrectHomeworkImages({
+    images: [{ imageBytes: new Uint8Array([1]), mimeType: "image/jpeg" }], subject: "Matematika", description: "U209", details: null,
+  });
+  assert.equal(verdict.debug.model, "test-verifier");
+  assert.equal(verdict.debug.checks[0]?.part, "U209 b)");
+  delete process.env.GEMINI_VERIFIER_MODEL;
 });
 
 test("Gemini retains individually labelled feedback for every visible task part", async (t) => {
@@ -348,6 +365,7 @@ test("AI refuses to judge answers when the task evidence is missing or omitted",
     done: true,
     correct: null,
     canVerifyCorrectness: false,
+    needsClearerPhoto: false,
     summary: "Kad galėčiau patikrinti atsakymus, įkelk aiškią užduočių puslapio nuotrauką, kur matosi klausimai ir visi skaičiai.",
     goodParts: [],
     needsWork: [],

@@ -1,13 +1,14 @@
 // Gemini AI client using the official @google/genai SDK — mirrors the
 // lazy-food Python backend (google-genai + GEMINI_API_KEY + Flash vision model).
 // Only server-side (route handlers / scripts) may import this module.
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, MediaResolution } from "@google/genai";
 import { sanitizeFreeText } from "./sanitize";
 
 export interface HomeworkEvaluation {
   done: boolean;
   correct: boolean | null;
   canVerifyCorrectness: boolean;
+  needsClearerPhoto: boolean;
   summary: string;
   goodParts: string[];
   needsWork: string[];
@@ -63,6 +64,16 @@ export function isAiConfigured(): boolean {
 
 function visionModel(): string {
   return process.env.GEMINI_VISION_MODEL ?? "gemini-2.5-flash";
+}
+
+function verifierModel(): string {
+  return process.env.GEMINI_VERIFIER_MODEL ?? "gemini-2.5-pro";
+}
+
+function imageResolution(): MediaResolution {
+  const configured = process.env.GEMINI_IMAGE_RESOLUTION?.trim().toLowerCase();
+  if (configured === "medium") return MediaResolution.MEDIA_RESOLUTION_MEDIUM;
+  return MediaResolution.MEDIA_RESOLUTION_HIGH;
 }
 
 function client(): GoogleGenAI {
@@ -147,6 +158,7 @@ function parseEvaluation(text: string, model: string): HomeworkEvaluation {
       done: obj.done === true,
       correct: null,
       canVerifyCorrectness: false,
+      needsClearerPhoto: false,
       summary: "Kad galėčiau patikrinti atsakymus, įkelk aiškią užduočių puslapio nuotrauką, kur matosi klausimai ir visi skaičiai.",
       goodParts: [],
       needsWork: [],
@@ -157,6 +169,7 @@ function parseEvaluation(text: string, model: string): HomeworkEvaluation {
     done: obj.done === true,
     correct: typeof obj.correct === "boolean" ? obj.correct : null,
     canVerifyCorrectness,
+    needsClearerPhoto: false,
     summary:
       typeof obj.summary === "string" ? sanitizeFreeText(obj.summary, 500) : "",
     goodParts: parts(obj.goodParts),
@@ -165,12 +178,14 @@ function parseEvaluation(text: string, model: string): HomeworkEvaluation {
   };
 }
 
-export async function evaluateHomeworkImages(input: {
+type HomeworkImagesInput = {
   images: Array<{ imageBytes: Uint8Array; mimeType: string }>;
   subject: string;
   description: string;
   details: string | null;
-}): Promise<HomeworkEvaluation> {
+};
+
+async function evaluateImages(input: HomeworkImagesInput, model: string): Promise<HomeworkEvaluation> {
   const subject = sanitizeFreeText(input.subject, 200);
   const description = sanitizeFreeText(input.description, 2000);
   const details = input.details ? sanitizeFreeText(input.details, 2000) : "";
@@ -186,7 +201,6 @@ export async function evaluateHomeworkImages(input: {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 30_000);
   try {
-    const model = visionModel();
     const response = await client().models.generateContent({
       model,
       contents: [
@@ -205,6 +219,7 @@ export async function evaluateHomeworkImages(input: {
       ],
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
+        mediaResolution: imageResolution(),
         responseMimeType: "application/json",
         temperature: 0,
         abortSignal: controller.signal,
@@ -224,6 +239,16 @@ export async function evaluateHomeworkImages(input: {
   } finally {
     clearTimeout(timer);
   }
+}
+
+export function evaluateHomeworkImages(input: HomeworkImagesInput): Promise<HomeworkEvaluation> {
+  return evaluateImages(input, visionModel());
+}
+
+// Called only after the initial result is negative. It receives the original
+// evidence but not the first model's transcription, so it can catch OCR errors.
+export function verifyIncorrectHomeworkImages(input: HomeworkImagesInput): Promise<HomeworkEvaluation> {
+  return evaluateImages(input, verifierModel());
 }
 
 export async function createLearningGuidance(input: {

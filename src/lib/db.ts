@@ -49,6 +49,7 @@ function migrate(database: DatabaseSync): void {
   add("ai_done", "ai_done INTEGER");
   add("ai_correct", "ai_correct INTEGER");
   add("ai_can_verify_correctness", "ai_can_verify_correctness INTEGER");
+  add("ai_needs_clearer_photo", "ai_needs_clearer_photo INTEGER");
   add("ai_summary", "ai_summary TEXT");
   add("ai_good_parts", "ai_good_parts TEXT");
   add("ai_needs_work", "ai_needs_work TEXT");
