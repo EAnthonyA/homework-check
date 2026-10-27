@@ -51,6 +51,7 @@ function parseDebug(value: string | null) {
 }
 
 export function submissionView(s: SubmissionWithUser, includeDebug = false) {
+  const debug = parseDebug(s.ai_debug);
   return {
     userId: s.user_id,
     userName: sanitizeFreeText(s.user_name, 200),
@@ -64,7 +65,14 @@ export function submissionView(s: SubmissionWithUser, includeDebug = false) {
     aiSummary: s.ai_summary,
     aiGoodParts: parseFeedbackParts(s.ai_good_parts),
     aiNeedsWork: parseFeedbackParts(s.ai_needs_work),
-    aiDebug: includeDebug ? parseDebug(s.ai_debug) : null,
+    aiReadings: (debug?.checks ?? []).filter((check) => check.verdict === "incorrect").map((check) => ({
+      part: check.part,
+      questionRead: check.questionRead,
+      answerRead: check.answerRead,
+    })),
+    aiDebug: includeDebug ? debug : null,
+    manualTaskText: s.manual_task_text,
+    aiUsedManualTask: s.ai_used_manual_task === 1,
     aiError: s.ai_error,
     aiEvaluatedAt: s.ai_evaluated_at,
     learningReason: s.learning_reason,

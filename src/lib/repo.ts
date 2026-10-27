@@ -86,6 +86,8 @@ export interface SubmissionWithUser {
   ai_good_parts: string | null;
   ai_needs_work: string | null;
   ai_debug: string | null;
+  manual_task_text: string | null;
+  ai_used_manual_task: number | null;
   ai_error: string | null;
   ai_evaluated_at: string | null;
   learning_reason: string | null;
@@ -440,10 +442,10 @@ export function upsertMessageItem(input: {
 const UPSERT_SUBMISSION_SQL = `
   INSERT INTO submissions (
     id, user_id, homework_id, image_path, image_paths, note,
-    ai_done, ai_correct, ai_can_verify_correctness, ai_needs_clearer_photo, ai_summary, ai_good_parts, ai_needs_work, ai_debug, ai_error, ai_evaluated_at,
+    ai_done, ai_correct, ai_can_verify_correctness, ai_needs_clearer_photo, ai_summary, ai_good_parts, ai_needs_work, ai_debug, manual_task_text, ai_used_manual_task, ai_error, ai_evaluated_at,
     learning_reason, learning_question, learning_guidance
   )
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   ON CONFLICT(user_id, homework_id) DO UPDATE SET
     image_path = excluded.image_path,
     image_paths = excluded.image_paths,
@@ -456,6 +458,8 @@ const UPSERT_SUBMISSION_SQL = `
     ai_good_parts = excluded.ai_good_parts,
     ai_needs_work = excluded.ai_needs_work,
     ai_debug = excluded.ai_debug,
+    manual_task_text = excluded.manual_task_text,
+    ai_used_manual_task = excluded.ai_used_manual_task,
     ai_error = excluded.ai_error,
     ai_evaluated_at = excluded.ai_evaluated_at,
     learning_reason = NULL,
@@ -476,6 +480,9 @@ export function upsertSubmission(input: {
   aiGoodParts?: string[];
   aiNeedsWork?: string[];
   aiDebug?: string | null;
+  manualTaskText?: string | null;
+  aiUsedManualTask?: boolean | null;
+  expectedSubmissionImagePaths?: string[];
   aiError?: string | null;
   aiEvaluatedAt?: string | null;
 }): void {
@@ -497,6 +504,8 @@ export function upsertSubmission(input: {
     input.aiGoodParts ? JSON.stringify(input.aiGoodParts) : null,
     input.aiNeedsWork ? JSON.stringify(input.aiNeedsWork) : null,
     input.aiDebug ?? null,
+    input.manualTaskText ?? null,
+    input.aiUsedManualTask == null ? null : input.aiUsedManualTask ? 1 : 0,
     input.aiError ?? null,
     input.aiEvaluatedAt ?? null,
     null,
@@ -533,11 +542,19 @@ export function commitSubmission(
       db.exec("ROLLBACK");
       return false;
     }
+    if (input.expectedSubmissionImagePaths) {
+      const current = getSubmission(input.userId, input.homeworkId);
+      const currentPaths = current?.image_paths ?? (current ? JSON.stringify([current.image_path]) : null);
+      if (!current || currentPaths !== JSON.stringify(input.expectedSubmissionImagePaths)) {
+        db.exec("ROLLBACK");
+        return false;
+      }
+    }
     upsertSubmission(input);
     // A photographed solution is complete only when AI can confirm both that
     // the whole task is present and that it is correct. A partial or incorrect
     // solution remains active so the child can read the feedback and retry.
-    if (input.aiDone && input.aiCorrect === true) {
+    if (input.aiDone && input.aiCorrect === true && !input.aiUsedManualTask) {
       markHomeworkDone(input.homeworkId, input.userId, "ai");
     }
     db.exec("COMMIT");

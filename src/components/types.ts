@@ -21,6 +21,11 @@ export interface SubmissionView {
   aiSummary: string | null;
   aiGoodParts: string[];
   aiNeedsWork: string[];
+  aiReadings: Array<{
+    part: string;
+    questionRead: string;
+    answerRead: string;
+  }>;
   aiDebug: {
     model: string;
     taskTextVisibility: "clear" | "partial" | "missing" | "unknown";
@@ -36,6 +41,8 @@ export interface SubmissionView {
     rawResponse: string;
     verificationRawResponse: string;
   } | null;
+  manualTaskText: string | null;
+  aiUsedManualTask: boolean;
   aiError: string | null;
   aiEvaluatedAt: string | null;
   learningReason: string | null;
