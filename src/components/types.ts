@@ -16,6 +16,7 @@ export interface SubmissionView {
   createdAt: string;
   aiDone: boolean | null;
   aiCorrect: boolean | null;
+  aiCanVerifyCorrectness: boolean | null;
   aiSummary: string | null;
   aiGoodParts: string[];
   aiNeedsWork: string[];

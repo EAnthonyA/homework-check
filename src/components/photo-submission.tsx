@@ -38,12 +38,14 @@ export function PhotoSubmission({ homeworkId, replacing, onResult }: {
       const response = await fetch("/api/upload", { method: "POST", body: form });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body.error ?? "Nepavyko pateikti. Bandyk dar kartą.");
-      return body as { completed: boolean; ai: { done: boolean; correct: boolean | null } | null };
+      return body as { completed: boolean; ai: { done: boolean; correct: boolean | null; canVerifyCorrectness: boolean } | null };
     },
     onSuccess: (result) => {
       clearPhotos();
       onResult(result.completed
         ? "AI patvirtino, kad darbas atliktas teisingai. Nuotraukos išsaugotos istorijoje."
+        : result.ai?.canVerifyCorrectness === false
+          ? "Kad AI galėtų patikrinti atsakymus, pridėk užduočių puslapio nuotrauką su klausimais."
         : result.ai?.done && result.ai.correct === false
           ? "AI rado klaidų. Perskaityk komentarą prie užduoties, pataisyk ir pateik iš naujo."
           : "Nuotraukos išsaugotos. Peržiūrėk vertinimą prie užduoties.");
@@ -77,7 +79,7 @@ export function PhotoSubmission({ homeworkId, replacing, onResult }: {
       </div>
       <p className="mt-1 text-xs leading-relaxed text-ink-soft">
         {replacing ? "Naujos nuotraukos pakeis ankstesnį pateikimą. " : ""}
-        Pridėk visus puslapius — įvertinsiu kartu. Iki 10 MB vienai nuotraukai.
+        Pridėk sprendimus ir užduočių puslapį su klausimais — tik tada galėsiu patikrinti atsakymus. Įvertinsiu viską kartu. Iki 10 MB vienai nuotraukai.
       </p>
       {photos.length > 0 && (
         <ol className="mt-3 grid grid-cols-3 gap-2">

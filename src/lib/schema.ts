@@ -39,6 +39,7 @@ CREATE TABLE IF NOT EXISTS submissions (
   note TEXT,
   ai_done INTEGER,
   ai_correct INTEGER,
+  ai_can_verify_correctness INTEGER,
   ai_summary TEXT,
   ai_good_parts TEXT,
   ai_needs_work TEXT,
