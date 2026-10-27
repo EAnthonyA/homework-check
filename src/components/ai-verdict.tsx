@@ -8,12 +8,14 @@ type Verdict =
   | { kind: "error" }
   | { kind: "notDone" }
   | { kind: "needsTaskPhoto" }
+  | { kind: "needsClearerPhoto" }
   | { kind: "done"; correct: boolean | null };
 
 const styles = {
   error: { text: "text-slate", mark: "mark-slate", label: "Neįvertinta" },
   notDone: { text: "text-pen-deep", mark: "mark-pen", label: "Neatlikta" },
   needsTaskPhoto: { text: "text-honey-deep", mark: "mark-honey", label: "Reikia užduočių" },
+  needsClearerPhoto: { text: "text-honey-deep", mark: "mark-honey", label: "Reikia aiškesnės nuotraukos" },
   wrong: { text: "text-honey-deep", mark: "mark-honey", label: "Reikia pataisyti" },
   right: { text: "text-leaf-deep", mark: "mark-leaf", label: "Atlikta ir teisinga" },
   done: { text: "text-slate", mark: "mark-slate", label: "Reikia peržiūros" },
@@ -23,6 +25,7 @@ function resolveVerdict(submission: SubmissionView): Verdict {
   if (submission.aiError) return { kind: "error" };
   if (submission.aiDone === null) return { kind: "none" };
   if (submission.aiDone === false) return { kind: "notDone" };
+  if (submission.aiNeedsClearerPhoto) return { kind: "needsClearerPhoto" };
   if (submission.aiCanVerifyCorrectness === false) return { kind: "needsTaskPhoto" };
   return { kind: "done", correct: submission.aiCorrect };
 }
@@ -31,6 +34,7 @@ function styleFor(v: Verdict) {
   if (v.kind === "error") return styles.error;
   if (v.kind === "notDone") return styles.notDone;
   if (v.kind === "needsTaskPhoto") return styles.needsTaskPhoto;
+  if (v.kind === "needsClearerPhoto") return styles.needsClearerPhoto;
   if (v.kind === "done" && v.correct === false) return styles.wrong;
   if (v.kind === "done" && v.correct === true) return styles.right;
   return styles.done;
@@ -48,7 +52,7 @@ export function AiVerdict({
 
   const s = styleFor(v);
 
-  const glyph = s === styles.error ? "—" : s === styles.wrong || s === styles.needsTaskPhoto ? "△" : s === styles.notDone ? "✗" : "✓";
+  const glyph = s === styles.error ? "—" : s === styles.wrong || s === styles.needsTaskPhoto || s === styles.needsClearerPhoto ? "△" : s === styles.notDone ? "✗" : "✓";
 
   if (compact) {
     return (

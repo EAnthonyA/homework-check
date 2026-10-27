@@ -40,6 +40,7 @@ CREATE TABLE IF NOT EXISTS submissions (
   ai_done INTEGER,
   ai_correct INTEGER,
   ai_can_verify_correctness INTEGER,
+  ai_needs_clearer_photo INTEGER,
   ai_summary TEXT,
   ai_good_parts TEXT,
   ai_needs_work TEXT,

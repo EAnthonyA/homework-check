@@ -17,6 +17,7 @@ export interface SubmissionView {
   aiDone: boolean | null;
   aiCorrect: boolean | null;
   aiCanVerifyCorrectness: boolean | null;
+  aiNeedsClearerPhoto: boolean;
   aiSummary: string | null;
   aiGoodParts: string[];
   aiNeedsWork: string[];

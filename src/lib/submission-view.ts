@@ -59,6 +59,7 @@ export function submissionView(s: SubmissionWithUser, includeDebug = false) {
     aiDone: s.ai_done === null ? null : s.ai_done === 1,
     aiCorrect: s.ai_correct === null ? null : s.ai_correct === 1,
     aiCanVerifyCorrectness: s.ai_can_verify_correctness === null ? null : s.ai_can_verify_correctness === 1,
+    aiNeedsClearerPhoto: s.ai_needs_clearer_photo === 1,
     aiSummary: s.ai_summary,
     aiGoodParts: parseFeedbackParts(s.ai_good_parts),
     aiNeedsWork: parseFeedbackParts(s.ai_needs_work),

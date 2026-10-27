@@ -3,7 +3,22 @@ import { getSession } from "@/lib/auth";
 import { getHomeworkById, commitSubmission } from "@/lib/repo";
 import { saveUpload, discardUnsavedUploads } from "@/lib/uploads";
 import { validatePhotos } from "@/lib/upload-rules";
-import { evaluateHomeworkImages, isAiConfigured } from "@/lib/ai";
+import { evaluateHomeworkImages, isAiConfigured, verifyIncorrectHomeworkImages, type HomeworkEvaluation } from "@/lib/ai";
+
+function normalizePart(value: string): string {
+  return value.toLowerCase().replace(/\s+/g, "").replace(/[^\p{L}\p{N}]/gu, "");
+}
+
+function sameIncorrectParts(first: HomeworkEvaluation, second: HomeworkEvaluation): boolean {
+  const incorrectParts = (evaluation: HomeworkEvaluation) => evaluation.debug.checks
+    .filter((check) => check.verdict === "incorrect")
+    .map((check) => normalizePart(check.part))
+    .filter(Boolean)
+    .sort();
+  const a = incorrectParts(first);
+  const b = incorrectParts(second);
+  return a.length > 0 && a.length === b.length && a.every((part, index) => part === b[index]);
+}
 
 export async function POST(request: Request) {
   const session = await getSession();
@@ -44,11 +59,11 @@ export async function POST(request: Request) {
     }
 
     // Evaluate every page together as one submission.
-    let ai: { done: boolean; correct: boolean | null; canVerifyCorrectness: boolean; summary: string; goodParts: string[]; needsWork: string[]; debug: object } | null = null;
+    let ai: HomeworkEvaluation | null = null;
     let aiError: string | null = null;
     if (isAiConfigured()) {
       try {
-        ai = await evaluateHomeworkImages({
+        const evaluationInput = {
           images: await Promise.all(files.map(async (file) => ({
             imageBytes: new Uint8Array(await file.arrayBuffer()),
             mimeType: file.type,
@@ -56,7 +71,45 @@ export async function POST(request: Request) {
           subject: homework.subject,
           description: homework.description,
           details: homework.details,
-        });
+        };
+        ai = await evaluateHomeworkImages(evaluationInput);
+
+        // A child should never be asked to redo work based on one potentially
+        // mistaken OCR read. A second model must independently flag the same
+        // parts before an incorrect verdict is kept.
+        if (ai.done && ai.correct === false) {
+          try {
+            const verification = await verifyIncorrectHomeworkImages(evaluationInput);
+            if (!(verification.done && verification.canVerifyCorrectness && verification.correct === false && sameIncorrectParts(ai, verification))) {
+              ai = {
+                ...ai,
+                correct: null,
+                needsClearerPhoto: true,
+                summary: "Negaliu patikimai patvirtinti klaidos — įkelk tiesią, stambią užduoties nuotrauką, kad aiškiai matytųsi visi skaičiai ir raidės.",
+                goodParts: [],
+                needsWork: [],
+                debug: {
+                  ...ai.debug,
+                  notes: [...ai.debug.notes, `Pakartotinis patikrinimas (${verification.debug.model}) nepatvirtino tų pačių klaidų.`].slice(0, 10),
+                },
+              };
+            }
+          } catch (error) {
+            console.error("[ai] homework verification failed:", error);
+            ai = {
+              ...ai,
+              correct: null,
+              needsClearerPhoto: true,
+              summary: "Nepavyko patikimai patvirtinti klaidos — įkelk tiesią, stambią užduoties nuotrauką, kad aiškiai matytųsi visi skaičiai ir raidės.",
+              goodParts: [],
+              needsWork: [],
+              debug: {
+                ...ai.debug,
+                notes: [...ai.debug.notes, "Pakartotinis AI patikrinimas nepasiekiamas."].slice(0, 10),
+              },
+            };
+          }
+        }
       } catch (err) {
         aiError = "Nepavyko įvertinti nuotraukų. Jas gali peržiūrėti tėvai arba gali pateikti dar kartą.";
         console.error("[ai] homework evaluation failed:", err);
@@ -71,6 +124,7 @@ export async function POST(request: Request) {
       aiDone: ai?.done ?? null,
       aiCorrect: ai?.correct ?? null,
       aiCanVerifyCorrectness: ai?.canVerifyCorrectness ?? null,
+      aiNeedsClearerPhoto: ai?.needsClearerPhoto ?? null,
       aiSummary: ai?.summary ?? null,
       aiGoodParts: ai?.goodParts,
       aiNeedsWork: ai?.needsWork,
@@ -91,7 +145,7 @@ export async function POST(request: Request) {
       imagePaths,
       completed,
       ai: ai
-        ? { done: ai.done, correct: ai.correct, canVerifyCorrectness: ai.canVerifyCorrectness, summary: ai.summary, goodParts: ai.goodParts, needsWork: ai.needsWork }
+        ? { done: ai.done, correct: ai.correct, canVerifyCorrectness: ai.canVerifyCorrectness, needsClearerPhoto: ai.needsClearerPhoto, summary: ai.summary, goodParts: ai.goodParts, needsWork: ai.needsWork }
         : null,
       aiError,
     });
