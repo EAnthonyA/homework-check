@@ -186,17 +186,20 @@ type HomeworkImagesInput = {
   subject: string;
   description: string;
   details: string | null;
+  manualTaskText?: string | null;
 };
 
 async function evaluateImages(input: HomeworkImagesInput, model: string): Promise<HomeworkEvaluation> {
   const subject = sanitizeFreeText(input.subject, 200);
   const description = sanitizeFreeText(input.description, 2000);
   const details = input.details ? sanitizeFreeText(input.details, 2000) : "";
+  const manualTaskText = input.manualTaskText ? sanitizeFreeText(input.manualTaskText, 2000) : "";
 
   const prompt = [
     `Dalykas: ${subject}`,
     `Užduotis: ${description}`,
     details ? `Papildoma informacija: ${details}` : "",
+    manualTaskText ? `Rankiniu būdu patikslinta užduoties sąlyga: ${manualTaskText}` : "",
   ]
     .filter(Boolean)
     .join("\n");

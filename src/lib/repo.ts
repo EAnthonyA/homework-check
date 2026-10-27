@@ -482,6 +482,7 @@ export function upsertSubmission(input: {
   aiDebug?: string | null;
   manualTaskText?: string | null;
   aiUsedManualTask?: boolean | null;
+  expectedSubmissionImagePaths?: string[];
   aiError?: string | null;
   aiEvaluatedAt?: string | null;
 }): void {
@@ -540,6 +541,14 @@ export function commitSubmission(
     if (!item || item.done_at || item.completion_version !== expectedVersion) {
       db.exec("ROLLBACK");
       return false;
+    }
+    if (input.expectedSubmissionImagePaths) {
+      const current = getSubmission(input.userId, input.homeworkId);
+      const currentPaths = current?.image_paths ?? (current ? JSON.stringify([current.image_path]) : null);
+      if (!current || currentPaths !== JSON.stringify(input.expectedSubmissionImagePaths)) {
+        db.exec("ROLLBACK");
+        return false;
+      }
     }
     upsertSubmission(input);
     // A photographed solution is complete only when AI can confirm both that

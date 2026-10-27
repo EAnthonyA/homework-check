@@ -59,7 +59,8 @@ export async function POST(request: Request, ctx: RouteContext<"/api/homework/[i
       images: await loadSubmissionImages(imagePaths),
       subject: homework.subject,
       description: homework.description,
-      details: [homework.details, `Rankiniu būdu patikslinta užduoties sąlyga: ${taskText}`].filter(Boolean).join("\n"),
+      details: homework.details,
+      manualTaskText: taskText,
     });
     const committed = commitSubmission({
       userId: session.id,
@@ -77,6 +78,7 @@ export async function POST(request: Request, ctx: RouteContext<"/api/homework/[i
       aiDebug: JSON.stringify(ai.debug),
       manualTaskText: taskText,
       aiUsedManualTask: true,
+      expectedSubmissionImagePaths: imagePaths,
       aiEvaluatedAt: new Date().toISOString(),
     }, homework.completion_version);
     if (!committed) return NextResponse.json({ error: "Darbo būsena pasikeitė. Atnaujink puslapį." }, { status: 409 });

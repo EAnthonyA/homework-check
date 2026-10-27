@@ -233,6 +233,18 @@ test("a manually supplied task condition never auto-completes homework", () => {
   assert.equal(repo.getHomeworkById(item.id)!.done_at, null);
 });
 
+test("a stale manual correction cannot overwrite replacement photos", () => {
+  const item = homework("manual-race");
+  const oldPhotos = ["/old.jpg"];
+  assert.equal(repo.commitSubmission({ userId: "kid", homeworkId: item.id, imagePaths: oldPhotos, aiDone: true, aiCorrect: false }, 0), true);
+  assert.equal(repo.commitSubmission({ userId: "kid", homeworkId: item.id, imagePaths: ["/new.jpg"], aiDone: true, aiCorrect: false }, 0), true);
+  assert.equal(repo.commitSubmission({
+    userId: "kid", homeworkId: item.id, imagePaths: oldPhotos, aiDone: true, aiCorrect: true,
+    manualTaskText: "Patikslinta sąlyga", aiUsedManualTask: true, expectedSubmissionImagePaths: oldPhotos,
+  }, 0), false);
+  assert.deepEqual(submissionView(repo.getSubmission("kid", item.id)!).imagePaths, ["/new.jpg"]);
+});
+
 test("undo preserves evidence, restores overdue visibility, and is idempotent", () => {
   const item = homework("undo");
   repo.commitSubmission({ userId: "kid", homeworkId: item.id, imagePaths: ["/proof.jpg"], aiDone: true, aiCorrect: true }, 0);
@@ -335,6 +347,21 @@ test("negative-verdict verifier uses its configured model and high image detail"
   assert.equal(verdict.debug.checks[0]?.part, "U209 b)");
   assert.deepEqual(verdict.debug.notes, []);
   delete process.env.GEMINI_VERIFIER_MODEL;
+});
+
+test("manual task text reaches AI intact even when homework details are present", async (t) => {
+  process.env.GEMINI_API_KEY = "test-key";
+  const manualTaskText = "a".repeat(2_000);
+  t.mock.method(globalThis, "fetch", async (_url: unknown, init: RequestInit) => {
+    const body = JSON.parse(String(init.body));
+    const prompt = body.contents[0].parts.find((part: { text?: string }) => part.text)?.text ?? "";
+    assert.match(prompt, new RegExp(`Rankiniu būdu patikslinta užduoties sąlyga: ${manualTaskText}$`));
+    return Response.json({ candidates: [{ content: { parts: [{ text: '{"done":true,"canVerifyCorrectness":true,"correct":true,"summary":"Gerai."}' }] } }] });
+  });
+  await evaluateHomeworkImages({
+    images: [{ imageBytes: new Uint8Array([1]), mimeType: "image/jpeg" }],
+    subject: "Matematika", description: "Užduotis", details: "Mokytojo informacija", manualTaskText,
+  });
 });
 
 test("Gemini retains individually labelled feedback for every visible task part", async (t) => {
