@@ -81,7 +81,7 @@ export async function POST(request: Request) {
           try {
             const verification = await verifyIncorrectHomeworkImages(evaluationInput);
             if (!(verification.done && verification.canVerifyCorrectness && verification.correct === false && sameIncorrectParts(ai, verification))) {
-              const verifierCouldRead = verification.done && verification.canVerifyCorrectness;
+              const verifierCouldRead = verification.done && verification.canVerifyCorrectness && verification.correct !== null;
               ai = {
                 ...ai,
                 correct: null,
