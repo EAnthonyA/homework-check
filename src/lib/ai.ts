@@ -3,6 +3,7 @@
 // Only server-side (route handlers / scripts) may import this module.
 import { GoogleGenAI, MediaResolution } from "@google/genai";
 import { sanitizeFreeText } from "./sanitize";
+import type { HelpTurn } from "./starting-help-history";
 
 export interface HomeworkEvaluation {
   done: boolean;
@@ -314,7 +315,7 @@ export async function createStartingHelp(input: {
   mode: "breakdown" | "explain" | "example" | "start" | "followup";
   part: string;
   question: string;
-  previous: string;
+  history: HelpTurn[];
   image?: { imageBytes: Uint8Array; mimeType: string };
 }): Promise<{ guidance: string; parts: string[] }> {
   const instruction = [
@@ -332,7 +333,10 @@ export async function createStartingHelp(input: {
     input.details ? `Papildoma informacija: ${sanitizeFreeText(input.details, 2000)}` : "",
     `Pagalbos tipas: ${input.mode}`,
     `Pasirinkta dalis: ${sanitizeFreeText(input.part, 600)}`,
-    `Ankstesnė pagalba: ${sanitizeFreeText(input.previous, 1400)}`,
+    ...input.history.flatMap((turn) => [
+      turn.question ? `Ankstesnis mokinio klausimas: ${sanitizeFreeText(turn.question, 600)}` : "",
+      turn.guidance ? `Ankstesnė pagalba: ${sanitizeFreeText(turn.guidance, 1400)}` : "",
+    ]),
     `Mokinio atsakymas ar klausimas: ${sanitizeFreeText(input.question, 600)}`,
   ].filter(Boolean).join("\n");
 

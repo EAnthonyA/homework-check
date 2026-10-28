@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Lightbulb, Loader2 } from "lucide-react";
+import { MAX_HELP_TURNS, type HelpTurn } from "@/lib/starting-help-history";
 import { ChoiceChip } from "./ui/choice-chip";
 import { TextArea, TextField } from "./ui/text-field";
 
@@ -15,6 +16,7 @@ export function StartingHelp({ homeworkId, description, requested }: { homeworkI
   const [photo, setPhoto] = useState<File | null>(null);
   const [guidance, setGuidance] = useState("");
   const [parts, setParts] = useState<string[]>([]);
+  const [history, setHistory] = useState<HelpTurn[]>([]);
 
   const queryClient = useQueryClient();
 
@@ -23,8 +25,8 @@ export function StartingHelp({ homeworkId, description, requested }: { homeworkI
       const form = new FormData();
       form.set("mode", mode);
       form.set("part", part);
-      form.set("question", question);
-      form.set("previous", guidance);
+      form.set("question", mode === "followup" ? question : "");
+      form.set("history", JSON.stringify(history));
 
       if (photo) form.set("photo", photo);
 
@@ -36,6 +38,10 @@ export function StartingHelp({ homeworkId, description, requested }: { homeworkI
     },
     onSuccess: (result, mode) => {
       setGuidance(result.guidance);
+      setHistory((turns) => [...turns, {
+        question: mode === "followup" ? question : "",
+        guidance: result.guidance,
+      }].slice(-MAX_HELP_TURNS));
 
       if (mode === "breakdown") setParts(result.parts);
     },
@@ -58,6 +64,7 @@ export function StartingHelp({ homeworkId, description, requested }: { homeworkI
     setPart(value);
     setGuidance("");
     setQuestion("");
+    setHistory([]);
     help.reset();
   }
 
@@ -84,7 +91,7 @@ export function StartingHelp({ homeworkId, description, requested }: { homeworkI
           {parts.length > 0 && (
             <div className="mt-3 flex flex-wrap gap-2" aria-label="Užduoties dalys">
               {parts.map((p, i) => (
-                <ChoiceChip key={`${p}-${i}`} selected={part === p} onClick={() => choosePart(p)}>
+                <ChoiceChip key={`${p}-${i}`} selected={part === p} disabled={help.isPending} onClick={() => choosePart(p)}>
                   {p}
                 </ChoiceChip>
               ))}
@@ -94,14 +101,14 @@ export function StartingHelp({ homeworkId, description, requested }: { homeworkI
           <label className="mt-3 block text-sm font-medium text-ink" htmlFor={`help-part-${homeworkId}`}>
             Kuri dalis? <span className="font-normal text-ink-soft">(gali palikti tuščią)</span>
           </label>
-          <TextField id={`help-part-${homeworkId}`} value={part} maxLength={600}
-            onChange={(event) => setPart(event.target.value)} placeholder="Pvz., 42 psl. 3 užduotis"
+          <TextField id={`help-part-${homeworkId}`} value={part} maxLength={600} disabled={help.isPending}
+            onChange={(event) => choosePart(event.target.value)} placeholder="Pvz., 42 psl. 3 užduotis"
             className="mt-1" />
 
           <label className="mt-3 block text-sm font-medium text-ink" htmlFor={`help-photo-${homeworkId}`}>
             Užduoties nuotrauka <span className="font-normal text-ink-soft">(nebūtina)</span>
           </label>
-          <input id={`help-photo-${homeworkId}`} type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/heic,image/heif"
+          <input id={`help-photo-${homeworkId}`} type="file" disabled={help.isPending} accept="image/jpeg,image/png,image/webp,image/gif,image/heic,image/heif"
             onChange={(event) => setPhoto(event.target.files?.[0] ?? null)} className="mt-1 block w-full text-sm text-ink-soft" />
           <p className="mt-1 text-xs text-ink-soft">Nuotrauka siunčiama AI pagalbai, bet neišsaugoma kaip atliktas darbas.</p>
 
@@ -135,7 +142,7 @@ export function StartingHelp({ homeworkId, description, requested }: { homeworkI
           {guidance && (
             <div className="mt-3">
               <label htmlFor={`help-question-${homeworkId}`} className="text-sm font-medium text-ink">Nori paklausti arba atsakyti?</label>
-              <TextArea id={`help-question-${homeworkId}`} value={question} maxLength={600}
+              <TextArea id={`help-question-${homeworkId}`} value={question} maxLength={600} disabled={help.isPending}
                 onChange={(event) => setQuestion(event.target.value)}
                 className="mt-1 min-h-20" />
               <button type="button" className="mt-1 text-sm font-medium text-pen-deep underline"

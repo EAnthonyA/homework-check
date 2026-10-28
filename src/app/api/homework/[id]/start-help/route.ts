@@ -4,6 +4,7 @@ import { createStartingHelp, isAiConfigured } from "@/lib/ai";
 import { getHomeworkById } from "@/lib/repo";
 import { sanitizeFreeText } from "@/lib/sanitize";
 import { validatePhotos } from "@/lib/upload-rules";
+import { parseHelpHistory } from "@/lib/starting-help-history";
 
 export async function POST(request: Request, ctx: RouteContext<"/api/homework/[id]/start-help">) {
   const session = await getSession();
@@ -51,7 +52,7 @@ export async function POST(request: Request, ctx: RouteContext<"/api/homework/[i
       mode,
       part: field("part", 600),
       question: field("question", 600),
-      previous: field("previous", 1400),
+      history: parseHelpHistory(form.get("history")),
       image: files[0] ? { imageBytes: new Uint8Array(await files[0].arrayBuffer()), mimeType: files[0].type } : undefined,
     });
 
