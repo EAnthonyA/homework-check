@@ -126,6 +126,13 @@ export function ParentDashboard({ session }: { session: SessionProp }) {
                 <span className="font-hand shrink-0 text-xl leading-none text-honey-deep">Neatlikta ✎</span>
               </div>
 
+              {item.helpRequests.map((request) => (
+                <div key={request.userId} className="mt-4 border-t border-dashed border-rule pt-3">
+                  <p className="font-hand text-xl text-pen-deep">{request.userName} reikia pagalbos</p>
+                  {request.part && <p className="mt-1 text-sm text-ink">Užduotis: {request.part}</p>}
+                  {request.question && <p className="mt-1 whitespace-pre-wrap text-sm text-ink-soft">{request.question}</p>}
+                </div>
+              ))}
               {item.submissions.length > 0 && (
                 <div className="mt-4 flex flex-col gap-3 border-t border-dashed border-rule pt-4">
                   {item.submissions.map((s) => (

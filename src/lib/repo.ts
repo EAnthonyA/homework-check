@@ -236,6 +236,22 @@ export function getHomeworkById(id: string): HomeworkRow | undefined {
   return stmt("SELECT * FROM homework_items WHERE id = ?").get(id) as HomeworkRow | undefined;
 }
 
+export function saveHomeworkHelpRequest(userId: string, homeworkId: string, part: string, question: string): void {
+  stmt(`INSERT INTO homework_help_requests (user_id, homework_id, part, question)
+    VALUES (?, ?, ?, ?) ON CONFLICT(user_id, homework_id) DO UPDATE SET
+    part = excluded.part, question = excluded.question, created_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')`)
+    .run(userId, homeworkId, part, question);
+}
+
+export function deleteHomeworkHelpRequest(userId: string, homeworkId: string): void {
+  stmt("DELETE FROM homework_help_requests WHERE user_id = ? AND homework_id = ?").run(userId, homeworkId);
+}
+
+export function listHomeworkHelpRequests(homeworkId: string): Array<{ userId: string; userName: string; part: string; question: string }> {
+  return stmt(`SELECT r.user_id AS userId, u.name AS userName, r.part, r.question
+    FROM homework_help_requests r JOIN users u ON u.id = r.user_id WHERE r.homework_id = ?`).all(homeworkId) as Array<{ userId: string; userName: string; part: string; question: string }>;
+}
+
 export function listHomeworkByDate(date: string): HomeworkRow[] {
   return stmt("SELECT * FROM homework_items WHERE due_date = ? ORDER BY subject ASC").all(date) as unknown as HomeworkRow[];
 }

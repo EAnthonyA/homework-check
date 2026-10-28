@@ -36,7 +36,7 @@ const { getDb } = await import("../src/lib/db");
 const { submissionView } = await import("../src/lib/submission-view");
 const { validatePhotos, MAX_PHOTOS, MAX_PHOTO_BYTES } = await import("../src/lib/upload-rules");
 const { saveUpload, discardUnsavedUploads, purgeExpiredUploads, uploadDir } = await import("../src/lib/uploads");
-const { evaluateHomeworkImages, verifyIncorrectHomeworkImages } = await import("../src/lib/ai");
+const { createStartingHelp, evaluateHomeworkImages, verifyIncorrectHomeworkImages } = await import("../src/lib/ai");
 
 after(() => {
   getDb().close();
@@ -330,6 +330,20 @@ test("Gemini receives all pages in one request and returns one combined verdict"
   assert.deepEqual(verdict.needsWork, []);
   assert.equal(verdict.debug.model, "gemini-2.5-flash");
   assert.equal(verdict.debug.handwritingLegibility, "unknown");
+});
+
+test("starting help sends the selected part and photo without requiring a submission", async (t) => {
+  process.env.GEMINI_API_KEY = "test-key";
+  t.mock.method(globalThis, "fetch", async (_url: unknown, init: RequestInit) => {
+    const body = JSON.parse(String(init.body));
+    assert.match(String(init.body), /3 užduotis/);
+    assert.match(String(init.body), /Never give the final answer/);
+    assert.equal(body.contents[0].parts[0].inlineData.data, "AQ==");
+    return Response.json({ candidates: [{ content: { parts: [{ text: '{"guidance":"Pradėk nuo sąlygos.","parts":["3 užduotis"]}' }] } }] });
+  });
+  const result = await createStartingHelp({ subject: "Matematika", description: "3 ir 4 užduotys", details: null, mode: "start", part: "3 užduotis", question: "", previous: "", image: { imageBytes: new Uint8Array([1]), mimeType: "image/jpeg" } });
+  assert.equal(result.guidance, "Pradėk nuo sąlygos.");
+  assert.deepEqual(result.parts, ["3 užduotis"]);
 });
 
 test("negative-verdict verifier uses its configured model and high image detail", async (t) => {

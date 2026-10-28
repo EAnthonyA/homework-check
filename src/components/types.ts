@@ -57,6 +57,7 @@ export interface HomeworkItemView {
   dueDate: string;
   details: string | null;
   mineDone: boolean;
+  helpRequests: Array<{ userId: string; userName: string; part: string; question: string }>;
   submissions: SubmissionView[];
 }
 

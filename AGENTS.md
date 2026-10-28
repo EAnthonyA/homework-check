@@ -36,6 +36,14 @@ Full setup and env vars: see `README.md`.
 
 ## Conventions
 
+### Readability and function complexity
+- Write code for the next person reading it. Put one statement per line; split long expressions, objects, and JSX into readable blocks.
+- Separate logical sections with blank lines: after state and hook declarations, between mutations and functions, and before conditionals and returns when they follow other statements. Keep related declarations together.
+- Use clear names, early returns, and small functions or components with one coherent responsibility. Extract code when it makes the flow easier to follow; avoid helpers that merely hide simple operations.
+- New or substantially changed functions should have cyclomatic complexity of at most 15, measured with ESLint's `complexity` rule. This includes component render functions and counts branches such as conditionals and logical operators. Split complex behavior into meaningful functions or components rather than rearranging code solely to satisfy the number.
+- Existing functions above the limit are a gradual cleanup: don't increase their complexity, and reduce it when modifying them where practical. If a function genuinely needs to exceed the limit, explain why in a nearby comment.
+- To check changed files, run `pnpm exec eslint <files...> --rule 'complexity: [warn, 15]'`. This is an agent guideline rather than a project-wide lint rule while existing violations remain.
+
 ### Next.js 16 specifics
 - This is NOT the Next.js you know (see the rules block above). Read `node_modules/next/dist/docs/` before writing framework code; heed deprecation notices.
 - This codebase uses Next's typed route signatures (e.g. `LayoutProps<"/">` in `src/app/layout.tsx`). Follow that pattern for new pages/layouts.

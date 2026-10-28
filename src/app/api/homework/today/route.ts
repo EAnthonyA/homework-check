@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
-import { listUnfinishedHomework, listSubmissionsForHomework } from "@/lib/repo";
+import { listUnfinishedHomework, listSubmissionsForHomework, listHomeworkHelpRequests } from "@/lib/repo";
 import { submissionView } from "@/lib/submission-view";
 import { vilniusDateString } from "@/lib/timezone";
 
@@ -20,6 +20,7 @@ export async function GET() {
       dueDate: h.due_date,
       details: h.details,
       mineDone: false,
+      helpRequests: listHomeworkHelpRequests(h.id).filter((r) => session.role === "parent" || r.userId === session.id),
       submissions: submissions.map((submission) => submissionView(submission, session.role === "parent")),
     };
   });
