@@ -12,7 +12,7 @@ export function startScheduler(): void {
   // `||` (not `??`) so an empty/whitespace env value falls back to the default;
   // an empty string otherwise reaches node-cron and crashes startup with
   // "pattern includes illegal characters".
-  const expression = process.env.SCRAPE_CRON?.trim() || "0 15 * * *";
+  const expression = process.env.SCRAPE_CRON?.trim() || "0 14-17 * * *";
 
   const purgedOnStart = purgeExpiredUploads();
   if (purgedOnStart) console.log(`[scheduler] removed ${purgedOnStart} expired upload(s)`);

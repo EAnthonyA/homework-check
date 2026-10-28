@@ -57,7 +57,7 @@ pnpm dev               # http://localhost:3000
 | `SESSION_SECRET` | 32+ char random string for session JWT signing (`openssl rand -hex 32`). |
 | `PARENT_EMAILS` | Comma-separated parent emails. First signed-in user defaults to parent. |
 | `ALLOWED_EMAILS` | Comma-separated emails allowed to sign in. Empty = anyone can sign in. `PARENT_EMAILS` are always allowed. |
-| `SCRAPE_CRON` | Cron expression (Europe/Vilnius). Default `0 15 * * *`. |
+| `SCRAPE_CRON` | Cron expression (Europe/Vilnius). Default `0 14-17 * * *` (14:00, 15:00, 16:00 and 17:00 daily). |
 | `UPLOAD_DIR` | Directory for uploaded images (`./data/uploads` locally). |
 | `UPLOAD_RETENTION_DAYS` | How long uploaded images are kept; defaults to `3`. Homework records and AI feedback remain. |
 | `APP_URL` | Optional public origin override (defaults to the request origin). |
