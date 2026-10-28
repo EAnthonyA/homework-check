@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Lightbulb, Loader2 } from "lucide-react";
+import { ChoiceChip } from "./ui/choice-chip";
+import { TextArea } from "./ui/text-field";
 import type { SubmissionView } from "./types";
 
 type Reason = "careless" | "did-not-understand" | "other";
@@ -41,18 +43,17 @@ export function LearningFollowup({ homeworkId, submission }: { homeworkId: strin
       <p className="mt-1 text-sm leading-relaxed text-ink-soft">Kas, tavo manymu, nutiko?</p>
       <div className="mt-2 flex flex-wrap gap-2">
         {reasonOptions.map((option) => (
-          <button key={option.value} type="button" disabled={help.isPending} onClick={() => setReason(option.value)}
-            className={`rounded-full border px-3 py-2 text-sm font-medium transition-colors ${reason === option.value ? "border-pen bg-pen/10 text-pen-deep" : "border-rule bg-sheet text-ink-soft hover:border-pen/40"}`}>
+          <ChoiceChip key={option.value} selected={reason === option.value} disabled={help.isPending} onClick={() => setReason(option.value)}>
             {option.label}
-          </button>
+          </ChoiceChip>
         ))}
       </div>
       {reason && (
         <div className="mt-3">
           <label htmlFor={`learning-question-${homeworkId}`} className="text-sm font-medium text-ink">Kuri dalis tau neaiški?</label>
-          <textarea id={`learning-question-${homeworkId}`} value={question} maxLength={600} disabled={help.isPending}
+          <TextArea id={`learning-question-${homeworkId}`} value={question} maxLength={600} disabled={help.isPending}
             onChange={(event) => setQuestion(event.target.value)} placeholder="Pavyzdžiui: nesuprantu, nuo ko pradėti…"
-            className="mt-1.5 min-h-24 w-full resize-y rounded-lg border border-rule bg-sheet px-3 py-2 text-sm leading-relaxed text-ink placeholder:text-ink-faint" />
+            className="mt-1.5 min-h-24" />
           <button type="button" className="btn btn-outline mt-2 w-full" disabled={help.isPending || question.trim().length < 3}
             onClick={() => help.mutate()}>
             {help.isPending ? <><Loader2 className="h-4 w-4 animate-spin" /> Ruošiama užuomina…</> : <><Lightbulb className="h-4 w-4" /> Gauti užuominą</>}

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Loader2, PencilLine } from "lucide-react";
+import { TextArea } from "./ui/text-field";
 import type { SubmissionView } from "./types";
 
 export function TaskTextCorrection({ homeworkId, submission }: { homeworkId: string; submission: SubmissionView }) {
@@ -42,9 +43,9 @@ export function TaskTextCorrection({ homeworkId, submission }: { homeworkId: str
       ) : (
         <div className="mt-3">
           <label htmlFor={`task-text-input-${homeworkId}`} className="text-sm font-medium text-ink">Teisinga užduoties sąlyga</label>
-          <textarea id={`task-text-input-${homeworkId}`} value={taskText} maxLength={2_000} disabled={correct.isPending}
+          <TextArea id={`task-text-input-${homeworkId}`} value={taskText} maxLength={2_000} disabled={correct.isPending}
             onChange={(event) => setTaskText(event.target.value)} placeholder="Pavyzdžiui: (324 − 36) : a = 324 : a − 36 : 6"
-            className="mt-1.5 min-h-28 w-full resize-y rounded-lg border border-rule bg-sheet px-3 py-2 text-sm leading-relaxed text-ink placeholder:text-ink-faint" />
+            className="mt-1.5 min-h-28" />
           <button type="button" className="btn btn-primary mt-2 w-full" disabled={correct.isPending || taskText.trim().length < 3}
             onClick={() => correct.mutate()}>
             {correct.isPending ? <><Loader2 className="h-4 w-4 animate-spin" /> Tikrinama iš naujo…</> : <><PencilLine className="h-4 w-4" /> Patikrinti pagal šią sąlygą</>}

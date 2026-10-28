@@ -75,6 +75,23 @@ test("authenticated upload, history and undo against the production server", { t
     assert.equal((await request("/api/homework/history", kid)).status, 403);
     assert.equal((await request("/api/upload", undefined, { method: "POST", body: photos(1) })).status, 401);
   });
+  await t.test("a child can request and withdraw help before submitting work", async () => {
+    const url = "/api/homework/overdue/help-request";
+    const body = JSON.stringify({ part: "3 užduotis", question: "Nuo ko pradėti?" });
+    const options = { method: "POST", headers: { "Content-Type": "application/json" }, body };
+    assert.equal((await request(url, undefined, options)).status, 401);
+    assert.equal((await request(url, parent, options)).status, 403);
+    assert.equal((await request("/api/homework/missing/help-request", kid, options)).status, 404);
+    assert.equal((await request(url, kid, options)).status, 200);
+    const parentView = await (await request("/api/homework/today", parent)).json();
+    assert.deepEqual(parentView.items[0].helpRequests, [{ userId: "kid", userName: "Vaikas", part: "3 užduotis", question: "Nuo ko pradėti?" }]);
+    assert.equal(parentView.items[0].submissions.length, 0);
+    assert.equal((await request(url, kid, { method: "DELETE" })).status, 200);
+    assert.deepEqual((await (await request("/api/homework/today", parent)).json()).items[0].helpRequests, []);
+    const form = new FormData();
+    form.set("mode", "start");
+    assert.equal((await request("/api/homework/overdue/start-help", kid, { method: "POST", body: form })).status, 503);
+  });
   await t.test("single-photo compatibility, seven-photo replacement, and invalid-set rollback", async () => {
     const single = await request("/api/upload", kid, { method: "POST", body: photos(1) });
     assert.equal(single.status, 200);

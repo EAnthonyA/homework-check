@@ -11,6 +11,7 @@ import { AssessmentPreview } from "./assessment-preview";
 import { MessagesPanel } from "./messages-panel";
 import { ConsultationsPanel } from "./consultations-panel";
 import { LearningFollowup } from "./learning-followup";
+import { StartingHelp } from "./starting-help";
 import { TaskTextCorrection } from "./task-text-correction";
 import { DashboardTabs, SwipeableDashboardPanels, type DashboardTab } from "./dashboard-tabs";
 import type { SessionProp, TodayResponse } from "./types";
@@ -83,6 +84,7 @@ export function KidView({ session }: { session: SessionProp }) {
                   </>
                 )}
               </div>}
+              <StartingHelp homeworkId={item.id} description={item.description} requested={item.helpRequests.some((request) => request.userId === session.id)} />
               <PhotoSubmission homeworkId={item.id} replacing={Boolean(mine)} onResult={setNotice} />
             </article>
           );

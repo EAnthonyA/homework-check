@@ -56,6 +56,15 @@ CREATE TABLE IF NOT EXISTS submissions (
   UNIQUE(user_id, homework_id)
 );
 
+CREATE TABLE IF NOT EXISTS homework_help_requests (
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  homework_id TEXT NOT NULL REFERENCES homework_items(id) ON DELETE CASCADE,
+  part TEXT NOT NULL DEFAULT '',
+  question TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  PRIMARY KEY (user_id, homework_id)
+);
+
 CREATE TABLE IF NOT EXISTS assessment_items (
   id TEXT PRIMARY KEY,
   source_id TEXT UNIQUE NOT NULL,
