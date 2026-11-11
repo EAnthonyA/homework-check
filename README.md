@@ -40,9 +40,9 @@ Validation: `pnpm test` runs isolated regression tests; `pnpm lint` and `pnpm bu
 check the app. After building, `pnpm test:integration` exercises authenticated HTTP
 routes against a temporary database and upload directory, with AI disabled.
 
-Production builds use Webpack (`next build --webpack`) to avoid a Turbopack
-Google Fonts query parsing failure with Fraunces in Next.js 16.3.5. Docker uses
-the same `pnpm build` command.
+Fonts are bundled in `src/app/fonts` and loaded with `next/font/local`, so builds
+do not fetch Google Fonts stylesheets or font files. Font sources and licenses
+are recorded alongside the assets.
 
 Requirements: Node 24, pnpm.
 
