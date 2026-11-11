@@ -1,25 +1,30 @@
 import type { Metadata } from "next";
-import { Caveat, Fraunces, Karla } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 import { Providers } from "@/components/providers";
 
-const karla = Karla({
+const karla = localFont({
+  src: "./fonts/karla.ttf",
   variable: "--font-karla",
-  subsets: ["latin", "latin-ext"],
-  weight: ["400", "500", "600", "700"],
+  weight: "200 800",
+  display: "swap",
 });
 
-const fraunces = Fraunces({
+const fraunces = localFont({
+  src: [
+    { path: "./fonts/fraunces.ttf", weight: "100 900", style: "normal" },
+    { path: "./fonts/fraunces-italic.ttf", weight: "100 900", style: "italic" },
+  ],
   variable: "--font-fraunces",
-  subsets: ["latin", "latin-ext"],
-  weight: ["500", "600", "700", "900"],
-  style: ["normal", "italic"],
+  display: "swap",
+  adjustFontFallback: "Times New Roman",
 });
 
-const caveat = Caveat({
+const caveat = localFont({
+  src: "./fonts/caveat.ttf",
   variable: "--font-caveat",
-  subsets: ["latin", "latin-ext"],
-  weight: ["500", "600", "700"],
+  weight: "400 700",
+  display: "swap",
 });
 
 export const metadata: Metadata = {

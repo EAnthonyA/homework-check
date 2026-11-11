@@ -40,6 +40,10 @@ Validation: `pnpm test` runs isolated regression tests; `pnpm lint` and `pnpm bu
 check the app. After building, `pnpm test:integration` exercises authenticated HTTP
 routes against a temporary database and upload directory, with AI disabled.
 
+Fonts are bundled in `src/app/fonts` and loaded with `next/font/local`, so builds
+do not fetch Google Fonts stylesheets or font files. Font sources and licenses
+are recorded alongside the assets.
+
 Requirements: Node 24, pnpm.
 
 ```bash
