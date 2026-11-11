@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
-import { evaluateHomeworkImages, isAiConfigured } from "@/lib/ai";
+import { evaluateHomeworkSubmission, isAiConfigured } from "@/lib/ai";
 import { getHomeworkById, getSubmission, commitSubmission } from "@/lib/repo";
 import { sanitizeFreeText } from "@/lib/sanitize";
 import { uploadDir } from "@/lib/uploads";
@@ -55,7 +55,7 @@ export async function POST(request: Request, ctx: RouteContext<"/api/homework/[i
   if (!imagePaths.length) return NextResponse.json({ error: "Pateiktų nuotraukų nebėra." }, { status: 409 });
 
   try {
-    const ai = await evaluateHomeworkImages({
+    const ai = await evaluateHomeworkSubmission({
       images: await loadSubmissionImages(imagePaths),
       subject: homework.subject,
       description: homework.description,

@@ -36,7 +36,7 @@ const { getDb } = await import("../src/lib/db");
 const { submissionView } = await import("../src/lib/submission-view");
 const { validatePhotos, MAX_PHOTOS, MAX_PHOTO_BYTES } = await import("../src/lib/upload-rules");
 const { saveUpload, discardUnsavedUploads, purgeExpiredUploads, uploadDir } = await import("../src/lib/uploads");
-const { createStartingHelp, evaluateHomeworkImages, verifyIncorrectHomeworkImages } = await import("../src/lib/ai");
+const { createStartingHelp, evaluateHomeworkImages, evaluateHomeworkSubmission, verifyIncorrectHomeworkImages } = await import("../src/lib/ai");
 const { parseHelpHistory } = await import("../src/lib/starting-help-history");
 
 after(() => {
@@ -329,7 +329,7 @@ test("Gemini receives all pages in one request and returns one combined verdict"
   assert.equal(verdict.summary, "Patikrink atsakymą.");
   assert.deepEqual(verdict.goodParts, []);
   assert.deepEqual(verdict.needsWork, []);
-  assert.equal(verdict.debug.model, "gemini-2.5-flash");
+  assert.equal(verdict.debug.model, "gemini-3.8-flash");
   assert.equal(verdict.debug.handwritingLegibility, "unknown");
 });
 
@@ -386,22 +386,19 @@ test("negative-verdict verifier uses its configured model and high image detail"
   delete process.env.GEMINI_VERIFIER_MODEL;
 });
 
-test("negative-verdict verifier falls back from Flash to the supported Pro model", async (t) => {
+test("negative-verdict verifier defaults to an independent Pro model", async (t) => {
   process.env.GEMINI_API_KEY = "test-key";
   delete process.env.GEMINI_VERIFIER_MODEL;
   const models: string[] = [];
   t.mock.method(globalThis, "fetch", async (url: unknown) => {
     const model = String(url).match(/models\/([^:]+)/)?.[1] ?? "";
     models.push(model);
-    if (model === "gemini-3.8-flash") {
-      return Response.json({ error: { message: "temporarily unavailable" } }, { status: 503 });
-    }
     return Response.json({ candidates: [{ content: { parts: [{ text: '{"done":true,"canVerifyCorrectness":true,"correct":false,"summary":"Patikrink."}' }] } }] });
   });
   const verdict = await verifyIncorrectHomeworkImages({
     images: [{ imageBytes: new Uint8Array([1]), mimeType: "image/jpeg" }], subject: "Matematika", description: "U209", details: null,
   });
-  assert.deepEqual(models, ["gemini-3.8-flash", "gemini-3.1-pro-preview"]);
+  assert.deepEqual(models, ["gemini-3.1-pro-preview"]);
   assert.equal(verdict.debug.model, "gemini-3.1-pro-preview");
 });
 
@@ -469,4 +466,169 @@ test("AI refuses to judge answers when the task evidence is missing or omitted",
   });
   assert.equal(debug.taskTextVisibility, "unknown");
   assert.match(debug.rawResponse, /Atrodo gerai/);
+});
+
+const gradingInput = {
+  images: [{ imageBytes: new Uint8Array([1]), mimeType: "image/jpeg" }],
+  subject: "Matematika",
+  description: "K39",
+  details: null,
+};
+
+function assessment(correct = false, questionRead = "12 km/h, 3 km/h greičiau, susitiko po 2 valandų", answerRead = "54 km") {
+  return {
+    done: true,
+    canVerifyCorrectness: true,
+    correct,
+    summary: correct ? "Teisinga." : "Patikrink K39.",
+    goodParts: correct ? ["K39 — teisinga"] : [],
+    needsWork: correct ? [] : ["K39 — patikrink"],
+    debug: {
+      taskTextVisibility: "clear",
+      handwritingLegibility: "clear",
+      checks: [{ part: "K39", verdict: correct ? "correct" : "incorrect", questionRead, answerRead, reason: "Perskaityta sąlyga." }],
+      notes: [],
+    },
+  };
+}
+
+function geminiResponse(value: unknown) {
+  return Response.json({ candidates: [{ content: { parts: [{ text: JSON.stringify(value) }] } }] });
+}
+
+test("a false allegation is rejected, with the independent reading saved only for parents", async (t) => {
+  process.env.GEMINI_API_KEY = "test-key";
+  const models: string[] = [];
+  const originalInputs: unknown[] = [];
+  t.mock.method(globalThis, "fetch", async (url: unknown, init: RequestInit) => {
+    models.push(String(url).match(/models\/([^:]+)/)?.[1] ?? "");
+    originalInputs.push(JSON.parse(String(init.body)).contents);
+    return geminiResponse(models.length === 1
+      ? assessment(false, "12 km/h, 5 km/h greičiau, 4 valandos, 120 km")
+      : assessment(true));
+  });
+
+  const result = await evaluateHomeworkSubmission(gradingInput);
+  assert.deepEqual(models, ["gemini-3.8-flash", "gemini-3.1-pro-preview"]);
+  assert.deepEqual(originalInputs[0], originalInputs[1]);
+  assert.equal(result.correct, null);
+  assert.equal(result.needsClearerPhoto, false);
+  assert.deepEqual(result.needsWork, []);
+  assert.equal(result.debug.initialAssessmentRejected, true);
+  assert.equal(result.debug.verification?.checks[0].verdict, "correct");
+  assert.match(result.debug.verification?.checks[0].questionRead ?? "", /2 valandų/);
+
+  const item = homework("rejected-allegation");
+  repo.commitSubmission({
+    userId: "kid", homeworkId: item.id, imagePaths: ["/k39.jpg"],
+    aiDone: result.done, aiCorrect: result.correct, aiCanVerifyCorrectness: result.canVerifyCorrectness,
+    aiDebug: JSON.stringify(result.debug),
+  }, 0);
+  const saved = repo.getSubmission("kid", item.id)!;
+  const child = submissionView(saved);
+  const parent = submissionView(saved, true);
+  assert.equal(child.aiDebug, null);
+  assert.deepEqual(child.aiReadings, []);
+  assert.equal(parent.aiDebug?.initialAssessmentRejected, true);
+  assert.equal(parent.aiDebug?.verification?.model, "gemini-3.1-pro-preview");
+  assert.equal(parent.aiDebug?.verification?.checks[0].answerRead, "54 km");
+  assert.equal(repo.getHomeworkById(item.id)?.done_at, null);
+
+  const { createElement } = await import("react");
+  const { renderToStaticMarkup } = await import("react-dom/server");
+  const { SubmissionEvidence } = await import("../src/components/submission-evidence");
+  const markup = renderToStaticMarkup(createElement(SubmissionEvidence, { submission: parent }));
+  assert.match(markup, /vertinimas atmestas/);
+  assert.match(markup, /Nepriklausomas pakartotinis vertinimas/);
+  assert.match(markup, /K39 — teisinga/);
+});
+
+test("matching exercise IDs cannot confirm different questions, answers, or operators", async (t) => {
+  process.env.GEMINI_API_KEY = "test-key";
+  for (const [first, second] of [
+    [assessment(), assessment(false, "12 km/h, 5 km/h greičiau, 4 valandos, 120 km")],
+    [assessment(), assessment(false, undefined, "59 km")],
+    [assessment(false, "12 + 3"), assessment(false, "12 - 3")],
+    [assessment(false, "1 2"), assessment(false, "12")],
+    [assessment(false, "neįskaitoma"), assessment(false, "neįskaitoma")],
+    [assessment(false, "a".repeat(2_001)), assessment(false, "a".repeat(2_001))],
+  ]) {
+    let requests = 0;
+    const mock = t.mock.method(globalThis, "fetch", async () => geminiResponse(requests++ === 0 ? first : second));
+    const result = await evaluateHomeworkSubmission(gradingInput);
+    assert.equal(requests, 2);
+    assert.equal(result.correct, null);
+    assert.deepEqual(result.needsWork, []);
+    mock.mock.restore();
+  }
+});
+
+test("only independent agreement on the full evidence retains a negative verdict", async (t) => {
+  process.env.GEMINI_API_KEY = "test-key";
+  t.mock.method(globalThis, "fetch", async () => geminiResponse(assessment()));
+  const result = await evaluateHomeworkSubmission({ ...gradingInput, manualTaskText: "Patikslinta sąlyga" });
+  assert.equal(result.correct, false);
+  assert.deepEqual(result.needsWork, ["K39 — patikrink"]);
+  assert.equal(result.debug.initialAssessmentRejected, false);
+  assert.equal(result.debug.verification?.model, "gemini-3.1-pro-preview");
+});
+
+test("verifier failure requires parent review without blaming the photo or child", async (t) => {
+  process.env.GEMINI_API_KEY = "test-key";
+  let requests = 0;
+  t.mock.method(console, "error", () => {});
+  t.mock.method(globalThis, "fetch", async () => {
+    requests++;
+    if (requests === 1) return geminiResponse(assessment());
+    return Response.json({ error: { message: "unavailable model" } }, { status: 400 });
+  });
+  const result = await evaluateHomeworkSubmission(gradingInput);
+  assert.equal(result.correct, null);
+  assert.equal(result.needsClearerPhoto, false);
+  assert.deepEqual(result.needsWork, []);
+  assert.match(result.summary, /tėvų peržiūrai/);
+});
+
+test("the primary model cannot serve as its own independent verifier", async (t) => {
+  process.env.GEMINI_API_KEY = "test-key";
+  process.env.GEMINI_VERIFIER_MODEL = "gemini-3.8-flash";
+  t.after(() => {
+    delete process.env.GEMINI_VERIFIER_MODEL;
+  });
+  t.mock.method(console, "error", () => {});
+  let requests = 0;
+  t.mock.method(globalThis, "fetch", async () => {
+    requests++;
+    return geminiResponse(assessment());
+  });
+  const result = await evaluateHomeworkSubmission(gradingInput);
+  assert.equal(requests, 1);
+  assert.equal(result.correct, null);
+  assert.deepEqual(result.needsWork, []);
+});
+
+test("correct work needs only the primary model and still completes automatically", async (t) => {
+  process.env.GEMINI_API_KEY = "test-key";
+  let requests = 0;
+  t.mock.method(globalThis, "fetch", async () => {
+    requests++;
+    return geminiResponse(assessment(true));
+  });
+  const result = await evaluateHomeworkSubmission(gradingInput);
+  assert.equal(requests, 1);
+  assert.equal(result.correct, true);
+  const item = homework("primary-approved");
+  repo.commitSubmission({ userId: "kid", homeworkId: item.id, imagePaths: ["/correct.jpg"], aiDone: result.done, aiCorrect: result.correct }, 0);
+  assert.ok(repo.getHomeworkById(item.id)?.done_at);
+});
+
+test("older rejected assessments remain marked as rejected and hidden from child corrections", () => {
+  const item = homework("legacy-rejected");
+  repo.commitSubmission({
+    userId: "kid", homeworkId: item.id, imagePaths: ["/old.jpg"], aiDone: true, aiCorrect: null,
+    aiDebug: JSON.stringify({ ...assessment().debug, model: "gemini-2.5-flash", notes: ["Pakartotinis patikrinimas (gemini-3.8-flash) nepatvirtino tų pačių klaidų."], verificationRawResponse: "old verification" }),
+  }, 0);
+  const saved = repo.getSubmission("kid", item.id)!;
+  assert.equal(submissionView(saved, true).aiDebug?.initialAssessmentRejected, true);
+  assert.deepEqual(submissionView(saved).aiReadings, []);
 });

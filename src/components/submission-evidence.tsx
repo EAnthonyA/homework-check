@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { AiVerdict } from "./ai-verdict";
-import type { SubmissionView } from "./types";
+import type { AssessmentEvidence, SubmissionView } from "./types";
 
 const visibilityLabel = {
   clear: "aiškiai matomas",
@@ -66,36 +66,17 @@ export function SubmissionEvidence({ submission }: { submission: SubmissionView 
       {submission.aiDebug && (
         <details className="mt-4 border-t border-dashed border-rule pt-3 text-sm text-ink-soft">
           <summary className="cursor-pointer font-medium text-ink marker:text-pen">AI vertinimo detalės tėvams</summary>
-          <div className="mt-3 space-y-3 leading-relaxed">
-            <p>
-              Užduoties tekstas: <strong className="font-semibold text-ink">{visibilityLabel[submission.aiDebug.taskTextVisibility]}</strong>
-              {" · "}Rašysena: <strong className="font-semibold text-ink">{legibilityLabel[submission.aiDebug.handwritingLegibility]}</strong>
-              {submission.aiDebug.model && <> · Modelis: {submission.aiDebug.model}</>}
-            </p>
-            {submission.aiDebug.checks.length > 0 && (
-              <ul className="space-y-3 border-l-2 border-rule pl-3">
-                {submission.aiDebug.checks.map((check, index) => (
-                  <li key={`${check.part}-${index}`}>
-                    <p className="font-medium text-ink">{check.part} — {checkLabel[check.verdict]}</p>
-                    <p>Užduotis perskaityta: {check.questionRead}</p>
-                    <p>Atsakymas perskaitytas: {check.answerRead}</p>
-                    <p>Priežastis: {check.reason}</p>
-                  </li>
-                ))}
-              </ul>
+          <div className="mt-3 space-y-4 leading-relaxed">
+            {submission.aiDebug.initialAssessmentRejected && (
+              <p className="font-semibold text-honey-deep">
+                Pirminė klaida nepatvirtinta. Šis vertinimas atmestas — vaiko taisyti neprašoma.
+              </p>
             )}
-            {submission.aiDebug.notes.length > 0 && (
-              <ul className="list-disc space-y-1 pl-4">
-                {submission.aiDebug.notes.map((note) => <li key={note}>{note}</li>)}
-              </ul>
+            <AssessmentDetails evidence={submission.aiDebug} title="Pirminis vertinimas" />
+            {submission.aiDebug.verification && (
+              <AssessmentDetails evidence={submission.aiDebug.verification} title="Nepriklausomas pakartotinis vertinimas" />
             )}
-            {submission.aiDebug.rawResponse && (
-              <details className="text-xs text-ink-faint">
-                <summary className="cursor-pointer">Žalias AI atsakymas</summary>
-                <p className="mt-1 break-words font-mono leading-relaxed">{submission.aiDebug.rawResponse}</p>
-              </details>
-            )}
-            {submission.aiDebug.verificationRawResponse && (
+            {!submission.aiDebug.verification && submission.aiDebug.verificationRawResponse && (
               <details className="text-xs text-ink-faint">
                 <summary className="cursor-pointer">Žalias pakartotinio tikrinimo atsakymas</summary>
                 <p className="mt-1 break-words font-mono leading-relaxed">{submission.aiDebug.verificationRawResponse}</p>
@@ -105,5 +86,36 @@ export function SubmissionEvidence({ submission }: { submission: SubmissionView 
         </details>
       )}
     </div>
+  );
+}
+
+function AssessmentDetails({ evidence, title }: { evidence: AssessmentEvidence; title: string }) {
+  return (
+    <section className="space-y-3">
+      <p className="font-semibold text-ink">{title} · {evidence.model}</p>
+      <p>
+        Užduoties tekstas: <strong className="font-semibold text-ink">{visibilityLabel[evidence.taskTextVisibility]}</strong>
+        {" · "}Rašysena: <strong className="font-semibold text-ink">{legibilityLabel[evidence.handwritingLegibility]}</strong>
+      </p>
+      <ul className="space-y-3 border-l-2 border-rule pl-3">
+        {evidence.checks.map((check, index) => (
+          <li key={`${check.part}-${index}`}>
+            <p className="font-medium text-ink">{check.part} — {checkLabel[check.verdict]}</p>
+            <p>Užduotis perskaityta: {check.questionRead}</p>
+            <p>Atsakymas perskaitytas: {check.answerRead}</p>
+            <p>Priežastis: {check.reason}</p>
+          </li>
+        ))}
+      </ul>
+      <ul className="list-disc space-y-1 pl-4">
+        {evidence.notes.map((note) => <li key={note}>{note}</li>)}
+      </ul>
+      {evidence.rawResponse && (
+        <details className="text-xs text-ink-faint">
+          <summary className="cursor-pointer">Žalias AI atsakymas</summary>
+          <p className="mt-1 break-words font-mono leading-relaxed">{evidence.rawResponse}</p>
+        </details>
+      )}
+    </section>
   );
 }

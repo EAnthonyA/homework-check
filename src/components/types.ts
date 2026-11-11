@@ -8,6 +8,21 @@ export interface SessionProp {
   role: Role;
 }
 
+export interface AssessmentEvidence {
+  model: string;
+  taskTextVisibility: "clear" | "partial" | "missing" | "unknown";
+  handwritingLegibility: "clear" | "mixed" | "unclear" | "unknown";
+  checks: Array<{
+    part: string;
+    verdict: "correct" | "incorrect" | "unverifiable";
+    questionRead: string;
+    answerRead: string;
+    reason: string;
+  }>;
+  notes: string[];
+  rawResponse: string;
+}
+
 export interface SubmissionView {
   userId: string;
   userName: string;
@@ -26,21 +41,11 @@ export interface SubmissionView {
     questionRead: string;
     answerRead: string;
   }>;
-  aiDebug: {
-    model: string;
-    taskTextVisibility: "clear" | "partial" | "missing" | "unknown";
-    handwritingLegibility: "clear" | "mixed" | "unclear" | "unknown";
-    checks: Array<{
-      part: string;
-      verdict: "correct" | "incorrect" | "unverifiable";
-      questionRead: string;
-      answerRead: string;
-      reason: string;
-    }>;
-    notes: string[];
-    rawResponse: string;
+  aiDebug: (AssessmentEvidence & {
+    initialAssessmentRejected?: boolean;
+    verification?: AssessmentEvidence | null;
     verificationRawResponse: string;
-  } | null;
+  }) | null;
   manualTaskText: string | null;
   aiUsedManualTask: boolean;
   aiError: string | null;

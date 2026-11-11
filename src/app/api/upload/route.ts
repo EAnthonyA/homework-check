@@ -3,22 +3,7 @@ import { getSession } from "@/lib/auth";
 import { getHomeworkById, commitSubmission } from "@/lib/repo";
 import { saveUpload, discardUnsavedUploads } from "@/lib/uploads";
 import { validatePhotos } from "@/lib/upload-rules";
-import { evaluateHomeworkImages, isAiConfigured, verifyIncorrectHomeworkImages, type HomeworkEvaluation } from "@/lib/ai";
-
-function normalizePart(value: string): string {
-  return value.toLowerCase().replace(/\s+/g, "").replace(/[^\p{L}\p{N}]/gu, "");
-}
-
-function sameIncorrectParts(first: HomeworkEvaluation, second: HomeworkEvaluation): boolean {
-  const incorrectParts = (evaluation: HomeworkEvaluation) => evaluation.debug.checks
-    .filter((check) => check.verdict === "incorrect")
-    .map((check) => normalizePart(check.part))
-    .filter(Boolean)
-    .sort();
-  const a = incorrectParts(first);
-  const b = incorrectParts(second);
-  return a.length > 0 && a.length === b.length && a.every((part, index) => part === b[index]);
-}
+import { evaluateHomeworkSubmission, isAiConfigured, type HomeworkEvaluation } from "@/lib/ai";
 
 export async function POST(request: Request) {
   const session = await getSession();
@@ -72,48 +57,7 @@ export async function POST(request: Request) {
           description: homework.description,
           details: homework.details,
         };
-        ai = await evaluateHomeworkImages(evaluationInput);
-
-        // A child should never be asked to redo work based on one potentially
-        // mistaken OCR read. A second model must independently flag the same
-        // parts before an incorrect verdict is kept.
-        if (ai.done && ai.correct === false) {
-          try {
-            const verification = await verifyIncorrectHomeworkImages(evaluationInput);
-            if (!(verification.done && verification.canVerifyCorrectness && verification.correct === false && sameIncorrectParts(ai, verification))) {
-              const verifierCouldRead = verification.done && verification.canVerifyCorrectness && verification.correct !== null;
-              ai = {
-                ...ai,
-                correct: null,
-                needsClearerPhoto: !verifierCouldRead,
-                summary: verifierCouldRead
-                  ? "Du nepriklausomi AI vertinimai nesutapo. Nuotraukos išsaugotos tėvų peržiūrai — vaiko taisyti neprašoma."
-                  : "Negaliu patikimai patvirtinti klaidos — įkelk tiesią, stambią užduoties nuotrauką, kad aiškiai matytųsi visi skaičiai ir raidės.",
-                goodParts: [],
-                needsWork: [],
-                debug: {
-                  ...ai.debug,
-                  verificationRawResponse: verification.debug.rawResponse,
-                  notes: [...ai.debug.notes, `Pakartotinis patikrinimas (${verification.debug.model}) nepatvirtino tų pačių klaidų.`].slice(0, 10),
-                },
-              };
-            }
-          } catch (error) {
-            console.error("[ai] homework verification failed:", error);
-            ai = {
-              ...ai,
-              correct: null,
-              needsClearerPhoto: true,
-              summary: "Nepavyko patikimai patvirtinti klaidos — įkelk tiesią, stambią užduoties nuotrauką, kad aiškiai matytųsi visi skaičiai ir raidės.",
-              goodParts: [],
-              needsWork: [],
-              debug: {
-                ...ai.debug,
-                notes: [...ai.debug.notes, `Pakartotinis AI patikrinimas nepasiekiamas: ${error instanceof Error ? error.message : "nežinoma klaida"}`].slice(0, 10),
-              },
-            };
-          }
-        }
+        ai = await evaluateHomeworkSubmission(evaluationInput);
       } catch (err) {
         aiError = "Nepavyko įvertinti nuotraukų. Jas gali peržiūrėti tėvai arba gali pateikti dar kartą.";
         console.error("[ai] homework evaluation failed:", err);
