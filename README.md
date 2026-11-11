@@ -63,7 +63,15 @@ pnpm dev               # http://localhost:3000
 | `APP_URL` | Optional public origin override (defaults to the request origin). |
 | `SCRAPER_DEBUG` | `1` to dump authenticated homework and assessments HTML to `./data/debug`. |
 | `GEMINI_API_KEY` | Google AI Studio API key. When set, all photos in a submission are sent together to Gemini to judge whether the task is done and correct. Empty = save photos without AI evaluation. |
-| `GEMINI_VISION_MODEL` | Vision model used for photo evaluation (default `gemini-2.5-flash`). |
+| `GEMINI_VERIFIER_MODEL` | Independent model for alleged mistakes (default `gemini-3.1-pro-preview`). Must differ from the vision model. |
+| `GEMINI_IMAGE_RESOLUTION` | Image detail: `high` (default) or `medium`. |
+| `GEMINI_VISION_MODEL` | Vision model used for photo evaluation (default `gemini-3.8-flash`). Explicit older overrides must be updated. |
+
+Negative assessments are independently checked against the original photos. Both
+models must agree on the exercise identifiers, question text, and student answers
+before the child is asked to correct work. Disagreements or verifier failures stay
+active for parent review; both available assessments are shown in the parent audit.
+The same policy applies when a child supplies a corrected task statement.
 
 ### Homework source (endpoints & credentials)
 

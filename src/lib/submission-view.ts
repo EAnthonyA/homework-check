@@ -13,37 +13,55 @@ function parseFeedbackParts(value: string | null): string[] {
   }
 }
 
+function parseAssessmentEvidence(value: unknown) {
+  if (typeof value !== "object" || value === null) return null;
+  const debug = value as Record<string, unknown>;
+  const text = (item: unknown, maxLength = 400) => typeof item === "string" ? sanitizeFreeText(item, maxLength) : "";
+  const allowed = <T extends string>(item: unknown, values: readonly T[], fallback: T) =>
+    typeof item === "string" && values.includes(item as T) ? item as T : fallback;
+  const checks = Array.isArray(debug.checks) ? debug.checks.flatMap((item) => {
+    if (typeof item !== "object" || item === null) return [];
+    const check = item as Record<string, unknown>;
+    return [{
+      part: text(check.part, 100) || "numeris neįskaitomas",
+      verdict: allowed(check.verdict, ["correct", "incorrect", "unverifiable"] as const, "unverifiable"),
+      questionRead: text(check.questionRead, 2_000) || "neįskaitoma",
+      answerRead: text(check.answerRead, 2_000) || "neįskaitoma",
+      reason: text(check.reason) || "AI nepateikė priežasties.",
+    }];
+  }).slice(0, 20) : [];
+  const notes = Array.isArray(debug.notes)
+    ? debug.notes.filter((item): item is string => typeof item === "string").map((item) => sanitizeFreeText(item, 300)).filter(Boolean).slice(0, 10)
+    : [];
+  return {
+    model: text(debug.model, 200),
+    taskTextVisibility: allowed(debug.taskTextVisibility, ["clear", "partial", "missing", "unknown"] as const, "unknown"),
+    handwritingLegibility: allowed(debug.handwritingLegibility, ["clear", "mixed", "unclear", "unknown"] as const, "unknown"),
+    checks,
+    notes,
+    rawResponse: text(debug.rawResponse, 6_000),
+  };
+}
+
 function parseDebug(value: string | null) {
   if (!value) return null;
+
   try {
     const parsed: unknown = JSON.parse(value);
-    if (typeof parsed !== "object" || parsed === null) return null;
+    const evidence = parseAssessmentEvidence(parsed);
+
+    if (!evidence) return null;
+
     const debug = parsed as Record<string, unknown>;
-    const text = (item: unknown, maxLength = 400) => typeof item === "string" ? sanitizeFreeText(item, maxLength) : "";
-    const allowed = <T extends string>(item: unknown, values: readonly T[], fallback: T) =>
-      typeof item === "string" && values.includes(item as T) ? item as T : fallback;
-    const checks = Array.isArray(debug.checks) ? debug.checks.flatMap((item) => {
-      if (typeof item !== "object" || item === null) return [];
-      const check = item as Record<string, unknown>;
-      return [{
-        part: text(check.part, 100) || "numeris neįskaitomas",
-        verdict: allowed(check.verdict, ["correct", "incorrect", "unverifiable"] as const, "unverifiable"),
-        questionRead: text(check.questionRead) || "neįskaitoma",
-        answerRead: text(check.answerRead) || "neįskaitoma",
-        reason: text(check.reason) || "AI nepateikė priežasties.",
-      }];
-    }).slice(0, 20) : [];
-    const notes = Array.isArray(debug.notes)
-      ? debug.notes.filter((item): item is string => typeof item === "string").map((item) => sanitizeFreeText(item, 300)).filter(Boolean).slice(0, 10)
-      : [];
+    const legacyRejection = evidence.notes.some((note) => note.includes("nepatvirtino tų pačių klaidų"));
+
     return {
-      model: text(debug.model, 200),
-      taskTextVisibility: allowed(debug.taskTextVisibility, ["clear", "partial", "missing", "unknown"] as const, "unknown"),
-      handwritingLegibility: allowed(debug.handwritingLegibility, ["clear", "mixed", "unclear", "unknown"] as const, "unknown"),
-      checks,
-      notes,
-      rawResponse: text(debug.rawResponse, 6_000),
-      verificationRawResponse: text(debug.verificationRawResponse, 6_000),
+      ...evidence,
+      initialAssessmentRejected: debug.initialAssessmentRejected === true || legacyRejection,
+      verification: parseAssessmentEvidence(debug.verification),
+      verificationRawResponse: typeof debug.verificationRawResponse === "string"
+        ? sanitizeFreeText(debug.verificationRawResponse, 6_000)
+        : "",
     };
   } catch {
     return null;
@@ -65,7 +83,7 @@ export function submissionView(s: SubmissionWithUser, includeDebug = false) {
     aiSummary: s.ai_summary,
     aiGoodParts: parseFeedbackParts(s.ai_good_parts),
     aiNeedsWork: parseFeedbackParts(s.ai_needs_work),
-    aiReadings: (debug?.checks ?? []).filter((check) => check.verdict === "incorrect").map((check) => ({
+    aiReadings: (s.ai_correct === 0 && !debug?.initialAssessmentRejected ? debug?.checks ?? [] : []).filter((check) => check.verdict === "incorrect").map((check) => ({
       part: check.part,
       questionRead: check.questionRead,
       answerRead: check.answerRead,

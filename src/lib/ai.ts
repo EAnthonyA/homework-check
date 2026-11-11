@@ -4,6 +4,7 @@
 import { GoogleGenAI, MediaResolution } from "@google/genai";
 import { sanitizeFreeText } from "./sanitize";
 import type { HelpTurn } from "./starting-help-history";
+import { reconcileHomeworkEvaluations, unconfirmedHomeworkEvaluation } from "./homework-evaluation";
 
 export interface HomeworkEvaluation {
   done: boolean;
@@ -16,7 +17,7 @@ export interface HomeworkEvaluation {
   debug: HomeworkEvaluationDebug;
 }
 
-export interface HomeworkEvaluationDebug {
+export interface HomeworkAssessmentEvidence {
   model: string;
   rawResponse: string;
   taskTextVisibility: "clear" | "partial" | "missing" | "unknown";
@@ -29,6 +30,11 @@ export interface HomeworkEvaluationDebug {
     reason: string;
   }>;
   notes: string[];
+}
+
+export interface HomeworkEvaluationDebug extends HomeworkAssessmentEvidence {
+  initialAssessmentRejected?: boolean;
+  verification?: HomeworkAssessmentEvidence;
   verificationRawResponse?: string;
 }
 
@@ -49,6 +55,7 @@ const SYSTEM_INSTRUCTION = [
   "When task numbers or letters are readable, goodParts and needsWork must be exact lists of answers: begin every evaluated part with its identifier, for example ‘1 b) — teisinga’, ‘12 — teisinga’, or ‘14 — pasitikrink datą’. List ALL visible correct and incorrect parts, up to 20 entries in each list; do not group them by topic or use vague terms such as ‘most’ or ‘calculations’. If a number is unreadable, explicitly say ‘numeris neįskaitomas’ and never invent one.",
   "If correct is false, needsWork must contain every identified incorrect part. Never give the correct final answer, exact correction, or a completed solution; for each incorrect part, state only what the student should check.",
   "Include debug information for a parent-only audit trail. This must be a concise evidence record, not hidden chain-of-thought: state only what was visibly read and the direct reason for the verdict. In debug, taskTextVisibility is clear, partial, or missing; handwritingLegibility is clear, mixed, or unclear. Add one checks entry for each judged or unreadable part. Its questionRead and answerRead say what was read, or ‘neįskaitoma’; its reason is Lithuanian and must not reveal a correct answer. Use verdict correct, incorrect, or unverifiable. notes is a short Lithuanian list of remaining visibility issues.",
+  "Transcribe questionRead and answerRead verbatim from the evidence, preserving the wording, numbers, units, and mathematical operators. Do not paraphrase, translate, or complete missing text. If a reading is uncertain, use ‘neįskaitoma’ and verdict unverifiable.",
   'Return ONLY valid JSON, without comments or code fences: {"done": true|false, "canVerifyCorrectness": true|false, "correct": true|false|null, "summary": "...", "goodParts": ["..."], "needsWork": ["..."], "debug":{"taskTextVisibility":"clear"|"partial"|"missing", "handwritingLegibility":"clear"|"mixed"|"unclear", "checks":[{"part":"...", "verdict":"correct"|"incorrect"|"unverifiable", "questionRead":"...", "answerRead":"...", "reason":"..."}], "notes":["..."]}}',
 ].join("\n");
 
@@ -65,12 +72,7 @@ export function isAiConfigured(): boolean {
 }
 
 function visionModel(): string {
-  return process.env.GEMINI_VISION_MODEL ?? "gemini-2.5-flash";
-}
-
-function verifierModels(): string[] {
-  const configured = process.env.GEMINI_VERIFIER_MODEL?.trim();
-  return configured ? [configured] : ["gemini-3.8-flash", "gemini-3.1-pro-preview"];
+  return process.env.GEMINI_VISION_MODEL?.trim() || "gemini-3.8-flash";
 }
 
 function imageResolution(): MediaResolution {
@@ -119,8 +121,8 @@ function parseDebug(value: unknown, rawResponse: string, model: string): Homewor
     return [{
       part: text(check.part, 100) || "numeris neįskaitomas",
       verdict,
-      questionRead: text(check.questionRead) || "neįskaitoma",
-      answerRead: text(check.answerRead) || "neįskaitoma",
+      questionRead: text(check.questionRead, 2_000) || "neįskaitoma",
+      answerRead: text(check.answerRead, 2_000) || "neįskaitoma",
       reason: text(check.reason) || "AI nepateikė priežasties.",
     }];
   }).slice(0, 20) : [];
@@ -190,7 +192,7 @@ type HomeworkImagesInput = {
   manualTaskText?: string | null;
 };
 
-async function evaluateImages(input: HomeworkImagesInput, model: string, timeoutMs = 30_000): Promise<HomeworkEvaluation> {
+async function evaluateImages(input: HomeworkImagesInput, model: string, timeoutMs = 60_000): Promise<HomeworkEvaluation> {
   const subject = sanitizeFreeText(input.subject, 200);
   const description = sanitizeFreeText(input.description, 2000);
   const details = input.details ? sanitizeFreeText(input.details, 2000) : "";
@@ -252,20 +254,31 @@ export function evaluateHomeworkImages(input: HomeworkImagesInput): Promise<Home
   return evaluateImages(input, visionModel());
 }
 
+// Every grading entry point uses this policy, including manual task corrections.
+export async function evaluateHomeworkSubmission(input: HomeworkImagesInput): Promise<HomeworkEvaluation> {
+  const initial = await evaluateHomeworkImages(input);
+
+  if (!initial.done || initial.correct !== false) return initial;
+
+  try {
+    const verification = await verifyIncorrectHomeworkImages(input);
+    return reconcileHomeworkEvaluations(initial, verification);
+  } catch (error) {
+    console.error("[ai] homework verification failed:", error);
+    return unconfirmedHomeworkEvaluation(initial);
+  }
+}
+
 // Called only after the initial result is negative. It receives the original
 // evidence but not the first model's transcription, so it can catch OCR errors.
 export async function verifyIncorrectHomeworkImages(input: HomeworkImagesInput): Promise<HomeworkEvaluation> {
-  const failures: string[] = [];
-  for (const model of verifierModels()) {
-    try {
-      // The independent verifier may use a reasoning model, which needs more
-      // time than the initial Flash pass to inspect the same photos.
-      return await evaluateImages(input, model, 60_000);
-    } catch (error) {
-      failures.push(`${model}: ${error instanceof Error ? error.message : "unknown error"}`);
-    }
+  const model = process.env.GEMINI_VERIFIER_MODEL?.trim() || "gemini-3.1-pro-preview";
+
+  if (model === visionModel()) {
+    throw new Error("An independent verifier model must differ from the primary model");
   }
-  throw new Error(failures.join("; "));
+
+  return evaluateImages(input, model);
 }
 
 export async function createLearningGuidance(input: {
