@@ -90,6 +90,8 @@ test("authenticated upload, history and undo against the production server", { t
     assert.deepEqual((await (await request("/api/homework/today", parent)).json()).items[0].helpRequests, []);
     const form = new FormData();
     form.set("mode", "start");
+    assert.equal((await request("/api/homework/overdue/start-help", kid, { method: "POST", body: form })).status, 400);
+    form.set("photo", new File(["sample"], "task.jpg", { type: "image/jpeg" }));
     assert.equal((await request("/api/homework/overdue/start-help", kid, { method: "POST", body: form })).status, 503);
   });
   await t.test("single-photo compatibility, seven-photo replacement, and invalid-set rollback", async () => {

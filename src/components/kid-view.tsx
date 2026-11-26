@@ -5,13 +5,12 @@ import { useQuery } from "@tanstack/react-query";
 import { formatDateHuman, vilniusDateString } from "@/lib/timezone";
 import { Header } from "./header";
 import { SubmissionEvidence } from "./submission-evidence";
-import { PhotoSubmission } from "./photo-submission";
+import { HomeworkActions } from "./homework-actions";
 import { HomeworkSections } from "./homework-sections";
 import { AssessmentPreview } from "./assessment-preview";
 import { MessagesPanel } from "./messages-panel";
 import { ConsultationsPanel } from "./consultations-panel";
 import { LearningFollowup } from "./learning-followup";
-import { StartingHelp } from "./starting-help";
 import { TaskTextCorrection } from "./task-text-correction";
 import { DashboardTabs, SwipeableDashboardPanels, type DashboardTab } from "./dashboard-tabs";
 import type { SessionProp, TodayResponse } from "./types";
@@ -35,7 +34,7 @@ export function KidView({ session }: { session: SessionProp }) {
         <p className="font-hand text-[1.35rem] leading-none text-pen-deep">{formatDateHuman(vilniusDateString())}</p>
         <h1 className="font-display mt-2 text-[2rem] font-black leading-[1.05] tracking-tight text-ink">Mano namų darbai</h1>
         <p className="mt-2.5 max-w-[38ch] text-[0.9375rem] leading-relaxed text-ink-soft">
-          Nesupranti užduoties? Paprašyk paaiškinti. Kai atliksi, pateik savo sprendimo nuotraukas.
+          Atlik užduotis ir pateik savo sprendimų nuotraukas. Jei prireiks, gali paprašyti pagalbos.
         </p>
         {notice && <p role="status" className="mt-4 text-sm text-ink">{notice}</p>}
       </section>
@@ -84,8 +83,8 @@ export function KidView({ session }: { session: SessionProp }) {
                   </>
                 )}
               </div>}
-              <StartingHelp homeworkId={item.id} description={item.description} requested={item.helpRequests.some((request) => request.userId === session.id)} />
-              <PhotoSubmission homeworkId={item.id} replacing={Boolean(mine)} onResult={setNotice} />
+              <HomeworkActions homeworkId={item.id} description={item.description} replacing={Boolean(mine)}
+                onResult={setNotice} />
             </article>
           );
         }}</HomeworkSections>}

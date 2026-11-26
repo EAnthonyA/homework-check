@@ -32,8 +32,6 @@ export async function POST(request: Request, ctx: RouteContext<"/api/homework/[i
 
   if (homework.done_at) return NextResponse.json({ error: "Darbas jau atliktas." }, { status: 409 });
 
-  if (!isAiConfigured()) return NextResponse.json({ error: "Pagalba dabar nepasiekiama. Gali paprašyti tėvų pagalbos." }, { status: 503 });
-
   const form = await request.formData().catch(() => null);
 
   if (!form) return NextResponse.json({ error: "Netinkami duomenys." }, { status: 400 });
@@ -46,13 +44,15 @@ export async function POST(request: Request, ctx: RouteContext<"/api/homework/[i
 
   const files = form.getAll("photo");
 
-  if (files.length > 1 || !files.every((file): file is File => file instanceof File)) return NextResponse.json({ error: "Pasirink vieną nuotrauką." }, { status: 400 });
+  if (files.length !== 1 || !files.every((file): file is File => file instanceof File)) return NextResponse.json({ error: "Pridėk vieną užduoties nuotrauką." }, { status: 400 });
 
   try {
-    if (files.length) validatePhotos(files);
+    validatePhotos(files);
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Netinkama nuotrauka." }, { status: 400 });
   }
+
+  if (!isAiConfigured()) return NextResponse.json({ error: "Pagalba dabar nepasiekiama. Gali paprašyti tėvų pagalbos." }, { status: 503 });
 
   const field = (key: string, max: number) => sanitizeFreeText(typeof form.get(key) === "string" ? form.get(key) as string : "", max);
 
