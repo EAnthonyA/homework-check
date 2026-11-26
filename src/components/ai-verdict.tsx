@@ -27,7 +27,7 @@ function resolveVerdict(submission: SubmissionView): Verdict {
   if (submission.aiError) return { kind: "error" };
   if (submission.aiDone === null) return { kind: "none" };
   if (submission.aiDone === false) return { kind: "notDone" };
-  if (submission.aiUsedManualTask && submission.aiCorrect === true) return { kind: "manualReview" };
+  if (submission.aiUsedManualTask && !submission.aiManualTaskVerified && submission.aiCorrect === true) return { kind: "manualReview" };
   if (submission.aiNeedsClearerPhoto) return { kind: "needsClearerPhoto" };
   if (submission.aiCanVerifyCorrectness === false) return { kind: "needsTaskPhoto" };
   return { kind: "done", correct: submission.aiCorrect };

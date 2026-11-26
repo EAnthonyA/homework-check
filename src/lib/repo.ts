@@ -308,10 +308,14 @@ function recordHomeworkEvent(homeworkId: string, userId: string | null, eventTyp
 
 export function homeworkQualityReport(since: string) {
   const summary = stmt(`
-    WITH first_checks AS (
-      SELECT e.homework_id, e.user_id, MIN(e.rowid) AS first_id
+    WITH recent_pairs AS (
+      SELECT DISTINCT e.homework_id, e.user_id
       FROM homework_events e JOIN users u ON u.id = e.user_id
       WHERE e.event_type = 'check' AND e.created_at >= ? AND u.role = 'kid'
+    ), first_checks AS (
+      SELECT e.homework_id, e.user_id, MIN(e.rowid) AS first_id
+      FROM homework_events e JOIN recent_pairs r ON r.homework_id = e.homework_id AND r.user_id = e.user_id
+      WHERE e.event_type = 'check'
       GROUP BY e.homework_id, e.user_id
     )
     SELECT COUNT(*) AS assignments,

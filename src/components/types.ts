@@ -50,6 +50,7 @@ export interface SubmissionView {
   }) | null;
   manualTaskText: string | null;
   aiUsedManualTask: boolean;
+  aiManualTaskVerified: boolean;
   aiError: string | null;
   aiEvaluatedAt: string | null;
   learningReason: string | null;

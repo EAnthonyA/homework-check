@@ -249,9 +249,18 @@ test("a manually supplied condition completes only after photo evidence is indep
   const item = homework("manual-verified");
   repo.commitSubmission({
     userId: "kid", homeworkId: item.id, imagePaths: ["/manual.jpg"], aiDone: true, aiCorrect: true,
-    aiUsedManualTask: true, manualTaskVerified: result.debug.manualTaskVerified,
+    aiUsedManualTask: true, manualTaskVerified: result.debug.manualTaskVerified, aiDebug: JSON.stringify(result.debug),
   }, 0);
   assert.equal(repo.getHomeworkById(item.id)?.done_source, "ai");
+  const { createElement } = await import("react");
+  const { renderToStaticMarkup } = await import("react-dom/server");
+  const { AiVerdict } = await import("../src/components/ai-verdict");
+  const submission = submissionView(repo.getSubmission("kid", item.id)!);
+  assert.equal(submission.aiManualTaskVerified, true);
+  assert.match(renderToStaticMarkup(createElement(AiVerdict, { submission })), /Atlikta ir teisinga/);
+  const legacy = submissionView(repo.getSubmission("kid", homework("manual-task").id)!);
+  assert.equal(legacy.aiManualTaskVerified, false);
+  assert.match(renderToStaticMarkup(createElement(AiVerdict, { submission: legacy })), /Reikia tėvų peržiūros/);
 });
 
 test("a stale manual correction cannot overwrite replacement photos", () => {
@@ -300,6 +309,23 @@ test("quality report counts child checks and recovery for the same child", () =>
   report = repo.homeworkQualityReport("2099-01-01");
   assert.ok(report.summary);
   assert.equal(report.summary.recovered_by_ai, 1);
+});
+
+test("quality report uses the first recorded check when retries cross the cutoff", () => {
+  const item = homework("quality-cutoff");
+  const insert = getDb().prepare(`
+    INSERT INTO homework_events (id, homework_id, user_id, event_type, reason, created_at)
+    VALUES (?, ?, 'kid', ?, ?, ?)
+  `);
+  insert.run("cutoff-first", item.id, "check", "incorrect", "2199-12-01T00:00:00.000Z");
+  insert.run("cutoff-retry", item.id, "check", "correct", "2200-01-02T00:00:00.000Z");
+  insert.run("cutoff-complete", item.id, "ai_completed", null, "2200-01-02T00:00:01.000Z");
+  const report = repo.homeworkQualityReport("2200-01-01T00:00:00.000Z");
+  assert.ok(report.summary);
+  assert.equal(report.summary.assignments, 1);
+  assert.equal(report.summary.first_check_correct, 0);
+  assert.equal(report.summary.recovered_by_ai, 1);
+  assert.deepEqual(report.reasons.map((row) => [row.reason, row.count]), [["correct", 1]]);
 });
 
 test("quality page shows success rate and waits for five assignments before warning", async () => {

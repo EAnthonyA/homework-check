@@ -57,6 +57,7 @@ function parseDebug(value: string | null) {
 
     return {
       ...evidence,
+      manualTaskVerified: debug.manualTaskVerified === true,
       confirmedChecks: parseAssessmentEvidence({ checks: debug.confirmedChecks })?.checks ?? [],
       initialAssessmentRejected: debug.initialAssessmentRejected === true || legacyRejection,
       verification: parseAssessmentEvidence(debug.verification),
@@ -94,6 +95,7 @@ export function submissionView(s: SubmissionWithUser, includeDebug = false) {
     aiDebug: includeDebug ? debug : null,
     manualTaskText: s.manual_task_text,
     aiUsedManualTask: s.ai_used_manual_task === 1,
+    aiManualTaskVerified: debug?.manualTaskVerified === true,
     aiError: s.ai_error,
     aiEvaluatedAt: s.ai_evaluated_at,
     learningReason: s.learning_reason,
