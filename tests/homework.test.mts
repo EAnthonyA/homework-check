@@ -21,7 +21,7 @@ process.env.UPLOAD_DIR = path.join(directory, "uploads");
 
 // Start with the deployed single-image schema to exercise real startup migration.
 const legacy = new DatabaseSync(process.env.DB_PATH);
-legacy.exec(SCHEMA_SQL.replace("  image_paths TEXT,\n", "").replace("  ai_can_verify_correctness INTEGER,\n", "").replace("  ai_needs_clearer_photo INTEGER,\n", "").replace("  manual_task_text TEXT,\n", "").replace("  ai_used_manual_task INTEGER,\n", "").replace("  done_source TEXT,\n", "").replace("  completion_version INTEGER NOT NULL DEFAULT 0,\n", ""));
+legacy.exec(SCHEMA_SQL.replace("  image_paths TEXT,\n", "").replace("  revision INTEGER NOT NULL DEFAULT 1,\n", "").replace("  ai_can_verify_correctness INTEGER,\n", "").replace("  ai_needs_clearer_photo INTEGER,\n", "").replace("  manual_task_text TEXT,\n", "").replace("  ai_used_manual_task INTEGER,\n", "").replace("  done_source TEXT,\n", "").replace("  completion_version INTEGER NOT NULL DEFAULT 0,\n", ""));
 legacy.exec(`
   INSERT INTO users (id, google_sub, email, name, role) VALUES ('kid', 'kid', 'kid@example.test', 'Vaikas', 'kid');
   INSERT INTO users (id, google_sub, email, name, role) VALUES ('parent', 'parent', 'parent@example.test', 'Tėvai', 'parent');
@@ -53,6 +53,7 @@ test("legacy photo migrates once, keeping unknown completion source neutral", ()
   assert.deepEqual(submissionView(submission).imagePaths, ["/api/uploads/old.jpg"]);
   assert.equal(submission.ai_can_verify_correctness, null);
   assert.equal(submission.manual_task_text, null);
+  assert.equal(submission.revision, 1);
   assert.equal(repo.getHomeworkById("legacy")!.done_source, null);
   execFileSync(process.execPath, ["--import", "tsx", "-e", "require('./src/lib/db.ts').getDb().close()"], { env: process.env });
   assert.equal(repo.getSubmission("kid", "legacy")!.image_paths, '["/api/uploads/old.jpg"]');
@@ -234,6 +235,25 @@ test("a manually supplied task condition never auto-completes homework", () => {
   assert.equal(repo.getHomeworkById(item.id)!.done_at, null);
 });
 
+test("a manually supplied condition completes only after photo evidence is independently verified", async (t) => {
+  process.env.GEMINI_API_KEY = "test-key";
+  const inputs: Array<{ contents: Array<{ parts: Array<{ text?: string }> }> }> = [];
+  t.mock.method(globalThis, "fetch", async (_url: unknown, init: RequestInit) => {
+    inputs.push(JSON.parse(String(init.body)));
+    return geminiResponse(assessment(true));
+  });
+  const result = await evaluateHomeworkSubmission({ ...gradingInput, manualTaskText: "Visas klausimas" });
+  assert.equal(result.debug.manualTaskVerified, true);
+  assert.match(inputs[0].contents[0].parts.at(-1)?.text ?? "", /Visas klausimas/);
+  assert.doesNotMatch(inputs[1].contents[0].parts.at(-1)?.text ?? "", /Visas klausimas/);
+  const item = homework("manual-verified");
+  repo.commitSubmission({
+    userId: "kid", homeworkId: item.id, imagePaths: ["/manual.jpg"], aiDone: true, aiCorrect: true,
+    aiUsedManualTask: true, manualTaskVerified: result.debug.manualTaskVerified,
+  }, 0);
+  assert.equal(repo.getHomeworkById(item.id)?.done_source, "ai");
+});
+
 test("a stale manual correction cannot overwrite replacement photos", () => {
   const item = homework("manual-race");
   const oldPhotos = ["/old.jpg"];
@@ -244,6 +264,61 @@ test("a stale manual correction cannot overwrite replacement photos", () => {
     manualTaskText: "Patikslinta sąlyga", aiUsedManualTask: true, expectedSubmissionImagePaths: oldPhotos,
   }, 0), false);
   assert.deepEqual(submissionView(repo.getSubmission("kid", item.id)!).imagePaths, ["/new.jpg"]);
+});
+
+test("submission revisions reject stale retries and retain event history", () => {
+  const item = homework("revision-history");
+  const base = { userId: "kid", homeworkId: item.id, imagePaths: ["/page.jpg"] };
+  assert.equal(repo.commitSubmission({ ...base, expectedRevision: null, aiDone: false }, 0), true);
+  assert.equal(repo.commitSubmission({ ...base, expectedRevision: null, aiDone: true, aiCorrect: true }, 0), false);
+  assert.equal(repo.commitSubmission({ ...base, expectedRevision: 1, aiDone: true, aiCorrect: true }, 0), true);
+  assert.equal(repo.getSubmission("kid", item.id)?.revision, 2);
+  const events = getDb().prepare("SELECT event_type, reason, submission_revision FROM homework_events WHERE homework_id = ? ORDER BY rowid").all(item.id);
+  assert.deepEqual(events.map((event) => [event.event_type, event.reason, event.submission_revision]), [
+    ["check", "incomplete", 1], ["check", "correct", 2], ["ai_completed", null, null],
+  ]);
+  const report = repo.homeworkQualityReport("2000-01-01");
+  assert.ok(report.summary);
+});
+
+test("quality report counts child checks and recovery for the same child", () => {
+  const item = homework("quality-child");
+  const insert = getDb().prepare(`
+    INSERT INTO homework_events (id, homework_id, user_id, event_type, reason, action, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, '2100-01-01T00:00:00.000Z')
+  `);
+  insert.run("quality-kid-check", item.id, "kid", "check", "incorrect", "fix_and_retry");
+  insert.run("quality-parent-check", item.id, "parent", "check", "correct", "complete");
+  insert.run("quality-parent-ai", item.id, "parent", "ai_completed", null, null);
+  let report = repo.homeworkQualityReport("2099-01-01");
+  assert.ok(report.summary);
+  assert.equal(report.summary.assignments, 1);
+  assert.equal(report.summary.first_check_correct, 0);
+  assert.equal(report.summary.recovered_by_ai, 0);
+  assert.deepEqual(report.reasons.map((row) => [row.reason, row.count]), [["incorrect", 1]]);
+  insert.run("quality-kid-ai", item.id, "kid", "ai_completed", null, null);
+  report = repo.homeworkQualityReport("2099-01-01");
+  assert.ok(report.summary);
+  assert.equal(report.summary.recovered_by_ai, 1);
+});
+
+test("quality page shows success rate and waits for five assignments before warning", async () => {
+  const { createElement } = await import("react");
+  const { renderToStaticMarkup } = await import("react-dom/server");
+  const { SuccessRate } = await import("../src/components/quality-view");
+  const report = {
+    since: "2026-01-01",
+    summary: { assignments: 4, first_check_correct: 1, recovered_by_ai: 1, parent_completed: 1, unresolved: 1 },
+    reasons: [],
+    reopenings: { count: 0 },
+    repeatedEvidenceRequests: { count: 0 },
+  };
+  const small = renderToStaticMarkup(createElement(SuccessRate, { report }));
+  assert.match(small, /50 %/);
+  assert.match(small, /per mažai duomenų/);
+  const low = renderToStaticMarkup(createElement(SuccessRate, { report: { ...report, summary: { ...report.summary, assignments: 5 } } }));
+  assert.match(low, /40 %/);
+  assert.match(low, /parodykite šią apžvalgą agentui/);
 });
 
 test("undo preserves evidence, restores overdue visibility, and is idempotent", () => {
@@ -503,13 +578,13 @@ test("a false allegation is rejected, with the independent reading saved only fo
   t.mock.method(globalThis, "fetch", async (url: unknown, init: RequestInit) => {
     models.push(String(url).match(/models\/([^:]+)/)?.[1] ?? "");
     originalInputs.push(JSON.parse(String(init.body)).contents);
-    return geminiResponse(models.length === 1
-      ? assessment(false, "12 km/h, 5 km/h greičiau, 4 valandos, 120 km")
-      : assessment(true));
+    if (models.length === 1) return geminiResponse(assessment(false, "12 km/h, 5 km/h greičiau, 4 valandos, 120 km"));
+    if (models.length === 2) return geminiResponse(assessment(true));
+    return geminiResponse(assessment(true, "neįskaitoma"));
   });
 
   const result = await evaluateHomeworkSubmission(gradingInput);
-  assert.deepEqual(models, ["gemini-3.8-flash", "gemini-3.1-pro-preview"]);
+  assert.deepEqual(models, ["gemini-3.8-flash", "gemini-3.1-pro-preview", "gemini-3.8-flash"]);
   assert.deepEqual(originalInputs[0], originalInputs[1]);
   assert.equal(result.correct, null);
   assert.equal(result.needsClearerPhoto, false);
@@ -543,6 +618,19 @@ test("a false allegation is rejected, with the independent reading saved only fo
   assert.match(markup, /K39 — teisinga/);
 });
 
+test("independently confirmed correct evidence resolves a false allegation", async (t) => {
+  process.env.GEMINI_API_KEY = "test-key";
+  let calls = 0;
+  t.mock.method(globalThis, "fetch", async () => geminiResponse(
+    calls++ === 0 ? assessment(false, "neteisingai perskaityta") : assessment(true),
+  ));
+  const result = await evaluateHomeworkSubmission(gradingInput);
+  assert.equal(calls, 3);
+  assert.equal(result.correct, true);
+  assert.equal(result.debug.initialAssessmentRejected, true);
+  assert.ok(result.debug.focusedRecheck);
+});
+
 test("matching exercise IDs cannot confirm different questions, answers, or operators", async (t) => {
   process.env.GEMINI_API_KEY = "test-key";
   for (const [first, second] of [
@@ -573,7 +661,33 @@ test("only independent agreement on the full evidence retains a negative verdict
   assert.equal(result.debug.verification?.model, "gemini-3.1-pro-preview");
 });
 
-test("verifier failure requires parent review without blaming the photo or child", async (t) => {
+test("matching evidence retains a confirmed part when another part differs", async (t) => {
+  process.env.GEMINI_API_KEY = "test-key";
+  const first = assessment(false, "K39: 12 + 3.", "15");
+  first.needsWork = ["K39 — pasitikrink veiksmą", "K40 — pasitikrink"];
+  first.debug.checks.push({ part: "K40", verdict: "incorrect", questionRead: "8 + 2", answerRead: "11", reason: "Patikrink." });
+  const second = assessment(false, "K39: 12 + 3", "15");
+  second.debug.checks.push({ part: "K40", verdict: "incorrect", questionRead: "8 + 2", answerRead: "neįskaitoma", reason: "Patikrink." });
+  let requests = 0;
+  t.mock.method(globalThis, "fetch", async () => geminiResponse(requests++ === 0 ? first : second));
+  const result = await evaluateHomeworkSubmission(gradingInput);
+  assert.equal(result.correct, false);
+  assert.deepEqual(result.needsWork, ["K39 — pasitikrink veiksmą"]);
+  assert.equal(result.debug.checks.length, 2);
+  assert.equal(result.debug.confirmedChecks?.length, 1);
+});
+
+test("a question number prefix can differ while mathematical content remains checked", async (t) => {
+  process.env.GEMINI_API_KEY = "test-key";
+  const first = assessment(false, "2 (5). ___ Dan and Lisa watch TV?", "Does");
+  const second = assessment(false, "___ Dan and Lisa watch TV?", "Does");
+  let requests = 0;
+  t.mock.method(globalThis, "fetch", async () => geminiResponse(requests++ === 0 ? first : second));
+  const result = await evaluateHomeworkSubmission(gradingInput);
+  assert.equal(result.correct, false);
+});
+
+test("verifier failure offers a retry without blaming the photo or child", async (t) => {
   process.env.GEMINI_API_KEY = "test-key";
   let requests = 0;
   t.mock.method(console, "error", () => {});
@@ -586,7 +700,7 @@ test("verifier failure requires parent review without blaming the photo or child
   assert.equal(result.correct, null);
   assert.equal(result.needsClearerPhoto, false);
   assert.deepEqual(result.needsWork, []);
-  assert.match(result.summary, /tėvų peržiūrai/);
+  assert.match(result.summary, /dar kartą/);
 });
 
 test("the primary model cannot serve as its own independent verifier", async (t) => {

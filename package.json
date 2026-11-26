@@ -9,6 +9,7 @@
     "lint": "eslint",
     "test": "tsx --test tests/homework.test.mts",
     "test:integration": "tsx --test tests/api.integration.mts",
+    "test:quality": "tsx tests/grading-quality.mts",
     "scrape": "tsx scripts/scrape-cli.ts"
   },
   "dependencies": {

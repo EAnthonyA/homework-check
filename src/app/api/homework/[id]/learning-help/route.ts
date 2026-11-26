@@ -18,7 +18,7 @@ export async function POST(request: Request, ctx: RouteContext<"/api/homework/[i
   if (!homework) return NextResponse.json({ error: "homework not found" }, { status: 404 });
 
   const submission = getSubmission(session.id, homeworkId);
-  if (!submission || submission.ai_done !== 1 || submission.ai_correct !== 0) {
+  if (!submission || submission.ai_correct !== 0 || !submission.ai_needs_work) {
     return NextResponse.json({ error: "Pagalba galima tik prie neteisingai atlikto darbo." }, { status: 409 });
   }
 

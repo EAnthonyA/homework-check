@@ -73,6 +73,9 @@ export function SubmissionEvidence({ submission }: { submission: SubmissionView 
               </p>
             )}
             <AssessmentDetails evidence={submission.aiDebug} title="Pirminis vertinimas" />
+            {submission.aiDebug.focusedRecheck && (
+              <AssessmentDetails evidence={submission.aiDebug.focusedRecheck} title="Papildomas patikrinimas" />
+            )}
             {submission.aiDebug.verification && (
               <AssessmentDetails evidence={submission.aiDebug.verification} title="Nepriklausomas pakartotinis vertinimas" />
             )}

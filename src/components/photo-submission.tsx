@@ -7,13 +7,15 @@ import { MAX_PHOTOS, validatePhotos } from "@/lib/upload-rules";
 
 type DraftPhoto = { file: File; url: string };
 
-export function PhotoSubmission({ homeworkId, replacing, onResult, visible }: {
+export function PhotoSubmission({ homeworkId, replacing, imagePaths, onResult, visible }: {
   homeworkId: string;
   visible: boolean;
   replacing: boolean;
+  imagePaths: string[];
   onResult: (message: string) => void;
 }) {
   const [photos, setPhotos] = useState<DraftPhoto[]>([]);
+  const [retained, setRetained] = useState(imagePaths);
   const [error, setError] = useState<string | null>(null);
   const urls = useRef(new Set<string>());
   const camera = useRef<HTMLInputElement>(null);
@@ -35,6 +37,7 @@ export function PhotoSubmission({ homeworkId, replacing, onResult, visible }: {
     mutationFn: async () => {
       const form = new FormData();
       form.append("homeworkId", homeworkId);
+      retained.forEach((imagePath) => form.append("retained", imagePath));
       photos.forEach(({ file }) => form.append("file", file));
       const response = await fetch("/api/upload", { method: "POST", body: form });
       const body = await response.json().catch(() => ({}));
@@ -47,6 +50,8 @@ export function PhotoSubmission({ homeworkId, replacing, onResult, visible }: {
         ? "AI patvirtino, kad darbas atliktas teisingai. Nuotraukos išsaugotos istorijoje."
         : result.ai?.needsClearerPhoto
           ? "AI perskaitymai nesutapo. Pridėk tiesią, stambią užduoties nuotrauką, kur aiškiai matosi visi skaičiai ir raidės."
+        : result.ai?.done === false
+          ? "Peržiūrėk vertinimą prie užduoties ir pridėk trūkstamas nuotraukas."
         : result.ai?.canVerifyCorrectness === false
           ? "Kad AI galėtų patikrinti atsakymus, pridėk užduočių puslapio nuotrauką su klausimais."
         : result.ai?.done && result.ai.correct === false
@@ -62,6 +67,7 @@ export function PhotoSubmission({ homeworkId, replacing, onResult, visible }: {
     const files = Array.from(selected);
     try {
       validatePhotos([...photos.map((photo) => photo.file), ...files]);
+      if (retained.length + photos.length + files.length > MAX_PHOTOS) throw new Error(`Galima pateikti iki ${MAX_PHOTOS} nuotraukų.`);
       const added = files.map((file) => {
         const url = URL.createObjectURL(file);
         urls.current.add(url);
@@ -78,12 +84,25 @@ export function PhotoSubmission({ homeworkId, replacing, onResult, visible }: {
     <div className="mt-2" hidden={!visible} aria-busy={upload.isPending}>
       <div className="flex items-baseline justify-between gap-2">
         <p className="text-base font-semibold text-ink">{replacing ? "Pateikti iš naujo" : "Atlikai? Pateik sprendimą"}</p>
-        <span className="shrink-0 text-xs text-ink-soft" aria-label={`${photos.length} iš ${MAX_PHOTOS} nuotraukų`}>{photos.length} / {MAX_PHOTOS}</span>
+        <span className="shrink-0 text-xs text-ink-soft" aria-label={`${retained.length + photos.length} iš ${MAX_PHOTOS} nuotraukų`}>{retained.length + photos.length} / {MAX_PHOTOS}</span>
       </div>
       <p className="mt-1 text-xs leading-relaxed text-ink-soft">
-        {replacing ? "Naujos nuotraukos pakeis ankstesnį pateikimą. " : ""}
+        {replacing ? "Išsaugotos nuotraukos bus įtrauktos. Pašalink tas, kurias nori pakeisti. " : ""}
         Nufotografuok sprendimus ir užduočių puslapį. Fotografuok tiesiai ir stambiai, kad matytųsi klausimai. Iki 10 MB vienai nuotraukai.
       </p>
+      {retained.length > 0 && (
+        <ol className="mt-3 grid grid-cols-3 gap-2">
+          {retained.map((imagePath, index) => (
+            <li key={imagePath} className="min-w-0">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={imagePath} alt={`${index + 1} išsaugota nuotrauka`} className="aspect-[3/4] w-full rounded-lg border border-rule bg-paper object-cover" />
+              <button type="button" className="min-h-11 w-full text-xs text-pen-deep" disabled={upload.isPending}
+                aria-label={`Pašalinti išsaugotą ${index + 1} nuotrauką`}
+                onClick={() => setRetained(retained.filter((path) => path !== imagePath))}>Pašalinti</button>
+            </li>
+          ))}
+        </ol>
+      )}
       {photos.length > 0 && (
         <ol className="mt-3 grid grid-cols-3 gap-2">
           {photos.map((photo, index) => (
@@ -105,16 +124,16 @@ export function PhotoSubmission({ homeworkId, replacing, onResult, visible }: {
         </ol>
       )}
       <div className="mt-3 flex flex-wrap gap-2">
-        <button type="button" className="btn btn-outline flex-1" disabled={upload.isPending || photos.length >= MAX_PHOTOS}
+        <button type="button" className="btn btn-outline flex-1" disabled={upload.isPending || retained.length + photos.length >= MAX_PHOTOS}
           onClick={() => camera.current?.click()}><Camera className="h-4 w-4" /> Fotografuoti</button>
-        <button type="button" className="btn btn-outline flex-1" disabled={upload.isPending || photos.length >= MAX_PHOTOS}
+        <button type="button" className="btn btn-outline flex-1" disabled={upload.isPending || retained.length + photos.length >= MAX_PHOTOS}
           onClick={() => gallery.current?.click()}><Images className="h-4 w-4" /> Iš galerijos</button>
       </div>
       <input ref={camera} type="file" accept="image/*" capture="environment" className="hidden" disabled={upload.isPending}
         onChange={(event) => { addPhotos(event.target.files); event.target.value = ""; }} />
       <input ref={gallery} type="file" accept="image/*" multiple className="hidden" disabled={upload.isPending}
         onChange={(event) => { addPhotos(event.target.files); event.target.value = ""; }} />
-      {photos.length > 0 && (
+      {(photos.length > 0 || retained.length > 0) && (
         <button type="button" className="btn btn-primary mt-3 w-full" disabled={upload.isPending}
           onClick={() => { setError(null); upload.mutate(); }}>
           {upload.isPending ? <><Loader2 className="h-4 w-4 animate-spin" /> Įkeliama ir vertinama…</> : "Pateikti vertinimui"}

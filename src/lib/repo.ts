@@ -91,6 +91,7 @@ export interface SubmissionWithUser {
   homework_id: string;
   image_path: string;
   image_paths: string | null;
+  revision: number;
   note: string | null;
   ai_done: number | null;
   ai_correct: number | null;
@@ -285,15 +286,66 @@ export function listUnfinishedHomework(): HomeworkRow[] {
 }
 
 export function markHomeworkDone(id: string, doneBy: string, source: "parent" | "ai" = "parent"): void {
-  stmt(
+  const result = stmt(
     "UPDATE homework_items SET done_at = strftime('%Y-%m-%dT%H:%M:%fZ','now'), done_by = ?, done_source = ?, completion_version = completion_version + 1, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ? AND done_at IS NULL",
   ).run(doneBy, source, id);
+  if (result.changes) {
+    recordHomeworkEvent(id, doneBy, source === "ai" ? "ai_completed" : "parent_completed");
+  }
 }
 
-export function reopenHomework(id: string): void {
-  stmt(
+export function reopenHomework(id: string, userId: string | null = null): void {
+  const result = stmt(
     "UPDATE homework_items SET done_at = NULL, done_by = NULL, done_source = NULL, completion_version = completion_version + 1, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ? AND done_at IS NOT NULL",
   ).run(id);
+  if (result.changes) recordHomeworkEvent(id, userId, "reopened");
+}
+
+function recordHomeworkEvent(homeworkId: string, userId: string | null, eventType: string, reason: string | null = null, revision: number | null = null, action: string | null = null): void {
+  stmt("INSERT INTO homework_events (id, homework_id, user_id, event_type, reason, submission_revision, action) VALUES (?, ?, ?, ?, ?, ?, ?)")
+    .run(newId(), homeworkId, userId, eventType, reason, revision, action);
+}
+
+export function homeworkQualityReport(since: string) {
+  const summary = stmt(`
+    WITH first_checks AS (
+      SELECT e.homework_id, e.user_id, MIN(e.rowid) AS first_id
+      FROM homework_events e JOIN users u ON u.id = e.user_id
+      WHERE e.event_type = 'check' AND e.created_at >= ? AND u.role = 'kid'
+      GROUP BY e.homework_id, e.user_id
+    )
+    SELECT COUNT(*) AS assignments,
+      SUM(CASE WHEN first.reason = 'correct' THEN 1 ELSE 0 END) AS first_check_correct,
+      SUM(CASE WHEN first.reason <> 'correct' AND EXISTS (
+        SELECT 1 FROM homework_events e
+        WHERE e.homework_id = first.homework_id AND e.user_id = first.user_id AND e.event_type = 'ai_completed'
+          AND e.rowid > first.rowid
+          AND NOT EXISTS (SELECT 1 FROM homework_events p WHERE p.homework_id = first.homework_id
+            AND p.event_type = 'parent_completed' AND p.rowid > first.rowid AND p.rowid < e.rowid)
+      ) THEN 1 ELSE 0 END) AS recovered_by_ai,
+      SUM(CASE WHEN h.done_source = 'parent' THEN 1 ELSE 0 END) AS parent_completed,
+      SUM(CASE WHEN h.done_at IS NULL THEN 1 ELSE 0 END) AS unresolved
+    FROM first_checks f JOIN homework_events first ON first.rowid = f.first_id
+    JOIN homework_items h ON h.id = first.homework_id
+  `).get(since);
+  const reasons = stmt(`SELECT e.reason, COUNT(*) AS count FROM homework_events e
+    JOIN users u ON u.id = e.user_id
+    WHERE e.event_type = 'check' AND e.created_at >= ? AND u.role = 'kid'
+    GROUP BY e.reason ORDER BY count DESC`).all(since);
+  const reopenings = stmt(`SELECT COUNT(*) AS count FROM homework_events r
+    WHERE r.event_type = 'reopened' AND r.created_at >= ? AND EXISTS (
+      SELECT 1 FROM homework_events a WHERE a.homework_id = r.homework_id AND a.event_type = 'ai_completed'
+        AND a.rowid = (SELECT MAX(p.rowid) FROM homework_events p WHERE p.homework_id = r.homework_id
+          AND p.rowid < r.rowid AND p.event_type IN ('ai_completed', 'parent_completed'))
+    )`).get(since);
+  const repeatedEvidenceRequests = stmt(`
+    SELECT COUNT(*) AS count FROM (
+      SELECT e.homework_id, e.user_id FROM homework_events e JOIN users u ON u.id = e.user_id
+      WHERE e.event_type = 'check' AND e.action = 'add_evidence_or_retry' AND e.created_at >= ? AND u.role = 'kid'
+      GROUP BY e.homework_id, e.user_id HAVING COUNT(*) > 1
+    )
+  `).get(since);
+  return { since, summary, reasons, reopenings, repeatedEvidenceRequests };
 }
 
 export function listHomeworkHistory(): HomeworkHistoryRow[] {
@@ -479,6 +531,7 @@ const UPSERT_SUBMISSION_SQL = `
   ON CONFLICT(user_id, homework_id) DO UPDATE SET
     image_path = excluded.image_path,
     image_paths = excluded.image_paths,
+    revision = submissions.revision + 1,
     note = excluded.note,
     ai_done = excluded.ai_done,
     ai_correct = excluded.ai_correct,
@@ -513,6 +566,8 @@ export function upsertSubmission(input: {
   manualTaskText?: string | null;
   aiUsedManualTask?: boolean | null;
   expectedSubmissionImagePaths?: string[];
+  expectedRevision?: number | null;
+  manualTaskVerified?: boolean;
   aiError?: string | null;
   aiEvaluatedAt?: string | null;
 }): void {
@@ -558,6 +613,28 @@ export function saveLearningGuidance(input: {
   `).run(input.reason, input.question, input.guidance, input.userId, input.homeworkId);
 }
 
+function submissionIsCurrent(input: Parameters<typeof upsertSubmission>[0]): boolean {
+  const current = getSubmission(input.userId, input.homeworkId);
+  if (input.expectedRevision !== undefined && (current?.revision ?? null) !== input.expectedRevision) return false;
+  if (!input.expectedSubmissionImagePaths) return true;
+  const currentPaths = current?.image_paths ?? (current ? JSON.stringify([current.image_path]) : null);
+  return Boolean(current && currentPaths === JSON.stringify(input.expectedSubmissionImagePaths));
+}
+
+function recordSubmissionCheck(input: Parameters<typeof upsertSubmission>[0], revision: number): void {
+  let reason = "uncertain";
+  if (input.aiError) reason = "error";
+  else if (input.aiDone === false) reason = "incomplete";
+  else if (input.aiUsedManualTask && !input.manualTaskVerified && input.aiCorrect === true) reason = "manual_review";
+  else if (input.aiCorrect === true) reason = "correct";
+  else if (input.aiCorrect === false) reason = "incorrect";
+  else if (input.aiCanVerifyCorrectness === false) reason = "missing_evidence";
+
+  const action = reason === "correct" ? "complete" : reason === "incorrect" ? "fix_and_retry"
+    : reason === "error" ? "retry" : "add_evidence_or_retry";
+  recordHomeworkEvent(input.homeworkId, input.userId, "check", reason, revision, action);
+}
+
 // Commit the evidence and its completion decision together, only if no parent
 // changed the status while evaluation was in flight (including done → undone).
 export function commitSubmission(
@@ -572,19 +649,16 @@ export function commitSubmission(
       db.exec("ROLLBACK");
       return false;
     }
-    if (input.expectedSubmissionImagePaths) {
-      const current = getSubmission(input.userId, input.homeworkId);
-      const currentPaths = current?.image_paths ?? (current ? JSON.stringify([current.image_path]) : null);
-      if (!current || currentPaths !== JSON.stringify(input.expectedSubmissionImagePaths)) {
-        db.exec("ROLLBACK");
-        return false;
-      }
+    if (!submissionIsCurrent(input)) {
+      db.exec("ROLLBACK");
+      return false;
     }
     upsertSubmission(input);
+    recordSubmissionCheck(input, getSubmission(input.userId, input.homeworkId)!.revision);
     // A photographed solution is complete only when AI can confirm both that
     // the whole task is present and that it is correct. A partial or incorrect
     // solution remains active so the child can read the feedback and retry.
-    if (input.aiDone && input.aiCorrect === true && !input.aiUsedManualTask) {
+    if (input.aiDone && input.aiCorrect === true && (!input.aiUsedManualTask || input.manualTaskVerified)) {
       markHomeworkDone(input.homeworkId, input.userId, "ai");
     }
     db.exec("COMMIT");

@@ -73,6 +73,15 @@ test("authenticated upload, history and undo against the production server", { t
     assert.equal((await request("/api/homework/overdue/done", kid, { method: "POST" })).status, 403);
     assert.equal((await request("/api/homework/missing/done", parent, { method: "DELETE" })).status, 404);
     assert.equal((await request("/api/homework/history", kid)).status, 403);
+    assert.equal((await request("/api/homework/quality", kid)).status, 403);
+    assert.equal((await request("/api/homework/quality", parent)).status, 200);
+    const anonymousPage = await request("/quality", undefined, { redirect: "manual" });
+    assert.equal(anonymousPage.status, 307);
+    assert.equal(anonymousPage.headers.get("location"), "/login");
+    const kidPage = await request("/quality", kid, { redirect: "manual" });
+    assert.equal(kidPage.status, 307);
+    assert.equal(kidPage.headers.get("location"), "/kid");
+    assert.equal((await request("/quality", parent)).status, 200);
     assert.equal((await request("/api/upload", undefined, { method: "POST", body: photos(1) })).status, 401);
   });
   await t.test("a child can request and withdraw help before submitting work", async () => {
@@ -93,6 +102,29 @@ test("authenticated upload, history and undo against the production server", { t
     assert.equal((await request("/api/homework/overdue/start-help", kid, { method: "POST", body: form })).status, 400);
     form.set("photo", new File(["sample"], "task.jpg", { type: "image/jpeg" }));
     assert.equal((await request("/api/homework/overdue/start-help", kid, { method: "POST", body: form })).status, 503);
+  });
+  await t.test("retained photos can be retried and expired photos are identified", async () => {
+    const first = await (await request("/api/upload", kid, { method: "POST", body: photos(1) })).json();
+    const retry = photos(1);
+    retry.append("retained", first.imagePath);
+    const response = await request("/api/upload", kid, { method: "POST", body: retry });
+    assert.equal(response.status, 200);
+    const second = await response.json();
+    assert.equal(second.imagePaths.length, 2);
+    assert.equal(second.imagePaths[0], first.imagePath);
+    const foreign = photos(1);
+    foreign.append("retained", "/api/uploads/not-owned.jpg");
+    assert.equal((await request("/api/upload", kid, { method: "POST", body: foreign })).status, 400);
+    const filename = path.basename(first.imagePath);
+    rmSync(path.join(directory, "uploads", filename));
+    const expired = new FormData();
+    expired.append("homeworkId", "overdue");
+    expired.append("retained", first.imagePath);
+    const missing = await request("/api/upload", kid, { method: "POST", body: expired });
+    assert.equal(missing.status, 409);
+    assert.match((await missing.json()).error, /1 nuotrauka nepasiekiama/);
+    const report = await (await request("/api/homework/quality", parent)).json();
+    assert.ok(report.summary.assignments >= 1);
   });
   await t.test("single-photo compatibility, seven-photo replacement, and invalid-set rollback", async () => {
     const single = await request("/api/upload", kid, { method: "POST", body: photos(1) });

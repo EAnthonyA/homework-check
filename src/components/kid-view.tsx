@@ -76,7 +76,7 @@ export function KidView({ session }: { session: SessionProp }) {
               </p>
               {mine && <div className="mt-4 border-t border-dashed border-rule pt-4">
                 <SubmissionEvidence submission={mine} />
-                {mine.aiDone && mine.aiCorrect === false && (
+                {mine.aiCorrect === false && mine.aiNeedsWork.length > 0 && (
                   <>
                     <TaskTextCorrection homeworkId={item.id} submission={mine} />
                     <LearningFollowup homeworkId={item.id} submission={mine} />
@@ -84,6 +84,7 @@ export function KidView({ session }: { session: SessionProp }) {
                 )}
               </div>}
               <HomeworkActions homeworkId={item.id} description={item.description} replacing={Boolean(mine)}
+                imagePaths={mine?.imagePaths ?? []} submissionKey={String(mine?.revision ?? "new")}
                 onResult={setNotice} />
             </article>
           );

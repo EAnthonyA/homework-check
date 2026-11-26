@@ -2,6 +2,7 @@
 import { randomUUID } from "node:crypto";
 import { mkdirSync, readdirSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import { readFile } from "node:fs/promises";
 import { IMAGE_EXTENSIONS, validatePhotos } from "./upload-rules";
 
 export function uploadDir(): string {
@@ -10,6 +11,18 @@ export function uploadDir(): string {
 
 const UPLOAD_NAME = /^[a-f0-9-]+\.(jpg|png|webp|gif|heic|heif)$/;
 const DEFAULT_RETENTION_DAYS = 3;
+const MIME_BY_EXTENSION: Record<string, string> = {
+  ".jpg": "image/jpeg", ".png": "image/png", ".webp": "image/webp",
+  ".gif": "image/gif", ".heic": "image/heic", ".heif": "image/heif",
+};
+
+export async function loadUpload(imagePath: string): Promise<{ imageBytes: Uint8Array; mimeType: string }> {
+  const prefix = "/api/uploads/";
+  const name = imagePath.startsWith(prefix) ? imagePath.slice(prefix.length) : "";
+  const mimeType = MIME_BY_EXTENSION[path.extname(name).toLowerCase()];
+  if (!UPLOAD_NAME.test(name) || !mimeType) throw new Error("invalid upload path");
+  return { imageBytes: new Uint8Array(await readFile(path.join(uploadDir(), name))), mimeType };
+}
 
 function uploadRetentionMs(): number {
   const configuredDays = Number(process.env.UPLOAD_RETENTION_DAYS);

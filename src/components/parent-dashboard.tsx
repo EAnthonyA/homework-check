@@ -3,7 +3,7 @@
 import { useState, type CSSProperties } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import { Check, History, Loader2 } from "lucide-react";
+import { ChartNoAxesCombined, Check, History, Loader2 } from "lucide-react";
 import { formatDateHuman, vilniusDateString } from "@/lib/timezone";
 import { Header } from "./header";
 import { SubmissionEvidence } from "./submission-evidence";
@@ -80,6 +80,9 @@ export function ParentDashboard({ session }: { session: SessionProp }) {
             <History className="h-5 w-5" />
           </Link>
         </div>
+        <Link href="/quality" className="mt-4 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-pen-deep">
+          <ChartNoAxesCombined className="h-4 w-4" /> AI tikrinimo apžvalga
+        </Link>
         {notice && <p role="status" className="mt-4 text-sm text-ink">{notice}</p>}
         {markDone.error && <p role="alert" className="mt-3 text-sm text-pen-deep">Nepavyko pažymėti darbo. Bandyk dar kartą.</p>}
       </section>

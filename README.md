@@ -40,6 +40,17 @@ Validation: `pnpm test` runs isolated regression tests; `pnpm lint` and `pnpm bu
 check the app. After building, `pnpm test:integration` exercises authenticated HTTP
 routes against a temporary database and upload directory, with AI disabled.
 
+For a local mobile grading journey, build first and run `pnpm test:quality`.
+Install Playwright locally or set `HOMEWORK_PLAYWRIGHT_MODULE` to its absolute
+module path. Set `HOMEWORK_CHROME_PATH` if Playwright has no browser installed.
+The default run replays grader responses. Set `HOMEWORK_LIVE_GRADING=1` and
+`GEMINI_API_KEY` to run the synthetic worksheets against Gemini. The command
+prints screenshot locations and fails when the child cannot complete a journey.
+For a signed-in parent, `GET /api/homework/quality` returns a read-only
+30-day report of checks, recovery after an unsuccessful first check, parent
+completion, reopenings, and repeated evidence requests. Events begin when this
+version is deployed. They contain outcome codes and identifiers, not answers.
+
 Fonts are bundled in `src/app/fonts` and loaded with `next/font/local`, so builds
 do not fetch Google Fonts stylesheets or font files. Font sources and licenses
 are recorded alongside the assets.
