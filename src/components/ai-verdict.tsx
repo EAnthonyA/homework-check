@@ -27,7 +27,7 @@ function resolveVerdict(submission: SubmissionView): Verdict {
   if (submission.aiError) return { kind: "error" };
   if (submission.aiDone === null) return { kind: "none" };
   if (submission.aiDone === false) return { kind: "notDone" };
-  if (submission.aiUsedManualTask && submission.aiCorrect === true) return { kind: "manualReview" };
+  if (submission.aiUsedManualTask && !submission.aiManualTaskVerified && submission.aiCorrect === true) return { kind: "manualReview" };
   if (submission.aiNeedsClearerPhoto) return { kind: "needsClearerPhoto" };
   if (submission.aiCanVerifyCorrectness === false) return { kind: "needsTaskPhoto" };
   return { kind: "done", correct: submission.aiCorrect };
@@ -56,7 +56,7 @@ export function AiVerdict({
 
   const s = styleFor(v);
 
-  const glyph = s === styles.error ? "—" : s === styles.wrong || s === styles.needsTaskPhoto || s === styles.needsClearerPhoto ? "△" : s === styles.notDone ? "✗" : "✓";
+  const glyph = s === styles.error ? "—" : s === styles.right ? "✓" : s === styles.notDone ? "✗" : "△";
 
   if (compact) {
     return (
@@ -74,7 +74,7 @@ export function AiVerdict({
       {submission.aiSummary && (
         <p className="font-hand mt-1.5 text-xl leading-snug text-ink-soft">{submission.aiSummary}</p>
       )}
-      {v.kind === "done" && v.correct === false && (submission.aiGoodParts.length > 0 || submission.aiNeedsWork.length > 0) && (
+      {submission.aiCorrect === false && (submission.aiGoodParts.length > 0 || submission.aiNeedsWork.length > 0) && (
         <div className="mt-3 grid gap-3 text-sm leading-relaxed sm:grid-cols-2">
           {submission.aiGoodParts.length > 0 && (
             <div>

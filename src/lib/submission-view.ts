@@ -57,8 +57,11 @@ function parseDebug(value: string | null) {
 
     return {
       ...evidence,
+      manualTaskVerified: debug.manualTaskVerified === true,
+      confirmedChecks: parseAssessmentEvidence({ checks: debug.confirmedChecks })?.checks ?? [],
       initialAssessmentRejected: debug.initialAssessmentRejected === true || legacyRejection,
       verification: parseAssessmentEvidence(debug.verification),
+      focusedRecheck: parseAssessmentEvidence(debug.focusedRecheck),
       verificationRawResponse: typeof debug.verificationRawResponse === "string"
         ? sanitizeFreeText(debug.verificationRawResponse, 6_000)
         : "",
@@ -75,6 +78,7 @@ export function submissionView(s: SubmissionWithUser, includeDebug = false) {
     userName: sanitizeFreeText(s.user_name, 200),
     imagePath: s.image_path,
     imagePaths: s.image_paths ? JSON.parse(s.image_paths) as string[] : [s.image_path],
+    revision: s.revision,
     createdAt: s.created_at,
     aiDone: s.ai_done === null ? null : s.ai_done === 1,
     aiCorrect: s.ai_correct === null ? null : s.ai_correct === 1,
@@ -83,7 +87,7 @@ export function submissionView(s: SubmissionWithUser, includeDebug = false) {
     aiSummary: s.ai_summary,
     aiGoodParts: parseFeedbackParts(s.ai_good_parts),
     aiNeedsWork: parseFeedbackParts(s.ai_needs_work),
-    aiReadings: (s.ai_correct === 0 && !debug?.initialAssessmentRejected ? debug?.checks ?? [] : []).filter((check) => check.verdict === "incorrect").map((check) => ({
+    aiReadings: (s.ai_correct === 0 ? (debug?.initialAssessmentRejected ? debug.confirmedChecks : debug?.checks) ?? [] : []).filter((check) => check.verdict === "incorrect").map((check) => ({
       part: check.part,
       questionRead: check.questionRead,
       answerRead: check.answerRead,
@@ -91,6 +95,7 @@ export function submissionView(s: SubmissionWithUser, includeDebug = false) {
     aiDebug: includeDebug ? debug : null,
     manualTaskText: s.manual_task_text,
     aiUsedManualTask: s.ai_used_manual_task === 1,
+    aiManualTaskVerified: debug?.manualTaskVerified === true,
     aiError: s.ai_error,
     aiEvaluatedAt: s.ai_evaluated_at,
     learningReason: s.learning_reason,

@@ -36,6 +36,7 @@ CREATE TABLE IF NOT EXISTS submissions (
   homework_id TEXT NOT NULL REFERENCES homework_items(id) ON DELETE CASCADE,
   image_path TEXT NOT NULL,
   image_paths TEXT,
+  revision INTEGER NOT NULL DEFAULT 1,
   note TEXT,
   ai_done INTEGER,
   ai_correct INTEGER,
@@ -55,6 +56,18 @@ CREATE TABLE IF NOT EXISTS submissions (
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   UNIQUE(user_id, homework_id)
 );
+
+CREATE TABLE IF NOT EXISTS homework_events (
+  id TEXT PRIMARY KEY,
+  homework_id TEXT NOT NULL REFERENCES homework_items(id) ON DELETE CASCADE,
+  user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+  event_type TEXT NOT NULL,
+  reason TEXT,
+  action TEXT,
+  submission_revision INTEGER,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+CREATE INDEX IF NOT EXISTS idx_homework_events_date ON homework_events(created_at);
 
 CREATE TABLE IF NOT EXISTS homework_help_requests (
   user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,

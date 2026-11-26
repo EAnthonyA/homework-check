@@ -4,7 +4,7 @@
 import { GoogleGenAI, MediaResolution } from "@google/genai";
 import { sanitizeFreeText } from "./sanitize";
 import type { HelpTurn } from "./starting-help-history";
-import { reconcileHomeworkEvaluations, unconfirmedHomeworkEvaluation } from "./homework-evaluation";
+import { reconcileHomeworkEvaluations, unconfirmedHomeworkEvaluation, sameCorrectEvidence } from "./homework-evaluation";
 
 export interface HomeworkEvaluation {
   done: boolean;
@@ -34,8 +34,11 @@ export interface HomeworkAssessmentEvidence {
 
 export interface HomeworkEvaluationDebug extends HomeworkAssessmentEvidence {
   initialAssessmentRejected?: boolean;
+  confirmedChecks?: HomeworkAssessmentEvidence["checks"];
   verification?: HomeworkAssessmentEvidence;
   verificationRawResponse?: string;
+  focusedRecheck?: HomeworkAssessmentEvidence;
+  manualTaskVerified?: boolean;
 }
 
 // Trusted directives only — the homework text and image are passed as opaque
@@ -47,6 +50,7 @@ const SYSTEM_INSTRUCTION = [
   "Assess separately whether the assignment is DONE and whether it is CORRECT. A submission can be considered complete only if both are true.",
   "Set done: true ONLY when the photo clearly shows written answers, exercises, or solutions for this specific homework.",
   "Set done: false when the photo is unrelated to the assignment (for example, another object, refrigerator, animal, or room), is a blank page, or shows only the assignment text without a solution.",
+  "If a solution is missing or not visible, say exactly which solution page or exercise the student should photograph and upload. If a question is missing, ask for that question instead. Do not ask for the question page when the missing evidence is the solution.",
   "Before evaluating an answer's correctness, you must see its full corresponding question: the condition, numbers, operations, and requirement. The assignment description may only be a reference (for example, ‘U209–U211’) — it is NOT the task text itself and is insufficient for checking answers.",
   "NEVER reconstruct or guess a workbook question from its task number, subject, the student's answer, or a familiar textbook exercise. If you cannot see a clear corresponding question for any answer being evaluated, set canVerifyCorrectness: false and correct: null. Then have summary ask in Lithuanian for a clear workbook or textbook page photo where the tasks and questions are visible; leave goodParts and needsWork empty.",
   "Set canVerifyCorrectness: true only when the questions for every answer being evaluated are clearly visible in the photos or fully included in the assignment text. Then set correct: true only if the entire completed assignment is correct; set false only if you find at least one independently verified error; set null if legibility or ambiguity prevents a reliable decision.",
@@ -165,7 +169,9 @@ function parseEvaluation(text: string, model: string): HomeworkEvaluation {
       correct: null,
       canVerifyCorrectness: false,
       needsClearerPhoto: false,
-      summary: "Kad galėčiau patikrinti atsakymus, įkelk aiškią užduočių puslapio nuotrauką, kur matosi klausimai ir visi skaičiai.",
+      summary: obj.done !== true && typeof obj.summary === "string"
+        ? sanitizeFreeText(obj.summary, 500)
+        : "Kad galėčiau patikrinti atsakymus, įkelk aiškią užduočių puslapio nuotrauką, kur matosi klausimai ir visi skaičiai.",
       goodParts: [],
       needsWork: [],
       debug,
@@ -190,6 +196,7 @@ type HomeworkImagesInput = {
   description: string;
   details: string | null;
   manualTaskText?: string | null;
+  focusParts?: string[];
 };
 
 async function evaluateImages(input: HomeworkImagesInput, model: string, timeoutMs = 60_000): Promise<HomeworkEvaluation> {
@@ -203,6 +210,7 @@ async function evaluateImages(input: HomeworkImagesInput, model: string, timeout
     `Užduotis: ${description}`,
     details ? `Papildoma informacija: ${details}` : "",
     manualTaskText ? `Rankiniu būdu patikslinta užduoties sąlyga: ${manualTaskText}` : "",
+    input.focusParts?.length ? `Atidžiai perskaityk šias užduoties dalis, taip pat patikrink visą darbą: ${input.focusParts.map((part) => sanitizeFreeText(part, 100)).join(", ")}` : "",
   ]
     .filter(Boolean)
     .join("\n");
@@ -258,10 +266,30 @@ export function evaluateHomeworkImages(input: HomeworkImagesInput): Promise<Home
 export async function evaluateHomeworkSubmission(input: HomeworkImagesInput): Promise<HomeworkEvaluation> {
   const initial = await evaluateHomeworkImages(input);
 
-  if (!initial.done || initial.correct !== false) return initial;
+  if (input.manualTaskText && initial.done && initial.correct === true && initial.canVerifyCorrectness) {
+    try {
+      const verification = await verifyIncorrectHomeworkImages({ ...input, manualTaskText: null });
+      if (sameCorrectEvidence(initial, verification)) {
+        return { ...initial, debug: { ...initial.debug, manualTaskVerified: true, verification: verification.debug } };
+      }
+    } catch (error) {
+      console.error("[ai] corrected task verification failed:", error);
+    }
+  }
+  if (initial.correct !== false) return initial;
 
   try {
     const verification = await verifyIncorrectHomeworkImages(input);
+    if (verification.done && verification.correct === true && verification.canVerifyCorrectness && !input.manualTaskText) {
+      const focusParts = initial.debug.checks.filter((check) => check.verdict === "incorrect").map((check) => check.part);
+      const recheck = await evaluateHomeworkImages({ ...input, focusParts });
+      if (sameCorrectEvidence(verification, recheck)) {
+        return {
+          ...verification,
+          debug: { ...initial.debug, initialAssessmentRejected: true, verification: verification.debug, focusedRecheck: recheck.debug },
+        };
+      }
+    }
     return reconcileHomeworkEvaluations(initial, verification);
   } catch (error) {
     console.error("[ai] homework verification failed:", error);

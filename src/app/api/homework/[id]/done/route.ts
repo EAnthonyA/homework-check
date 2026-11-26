@@ -24,6 +24,6 @@ export async function DELETE(_req: Request, ctx: RouteContext<"/api/homework/[id
   const item = getHomeworkById(id);
   if (!item) return NextResponse.json({ error: "not found" }, { status: 404 });
 
-  reopenHomework(id);
+  reopenHomework(id, session.id);
   return NextResponse.json({ ok: true });
 }

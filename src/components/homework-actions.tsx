@@ -4,10 +4,12 @@ import { useState } from "react";
 import { PhotoSubmission } from "./photo-submission";
 import { StartingHelp } from "./starting-help";
 
-export function HomeworkActions({ homeworkId, description, replacing, onResult }: {
+export function HomeworkActions({ homeworkId, description, replacing, imagePaths, submissionKey, onResult }: {
   homeworkId: string;
   description: string;
   replacing: boolean;
+  imagePaths: string[];
+  submissionKey: string;
   onResult: (message: string) => void;
 }) {
   const [path, setPath] = useState<"submit" | "help" | null>(null);
@@ -31,7 +33,7 @@ export function HomeworkActions({ homeworkId, description, replacing, onResult }
           ‹ Pasirinkti kitą veiksmą
         </button>
       )}
-      <PhotoSubmission homeworkId={homeworkId} replacing={replacing} onResult={onResult} visible={path === "submit"} />
+      <PhotoSubmission key={submissionKey} homeworkId={homeworkId} replacing={replacing} imagePaths={imagePaths} onResult={onResult} visible={path === "submit"} />
       <StartingHelp homeworkId={homeworkId} description={description} visible={path === "help"} />
     </div>
   );

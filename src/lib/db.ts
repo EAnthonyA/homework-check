@@ -33,6 +33,10 @@ export function getDb(): DatabaseSync {
 // creates tables if they don't exist, so columns added later need a manual
 // ALTER TABLE guarded by PRAGMA table_info.
 function migrate(database: DatabaseSync): void {
+  const events = database.prepare("PRAGMA table_info(homework_events)").all() as Array<{ name: string }>;
+  if (!events.some((column) => column.name === "action")) {
+    database.exec("ALTER TABLE homework_events ADD COLUMN action TEXT");
+  }
   const users = database.prepare("PRAGMA table_info(users)").all() as Array<{ name: string }>;
   if (users.some((c) => c.name === "encrypted_refresh_token")) {
     database.exec("UPDATE users SET encrypted_refresh_token = NULL WHERE encrypted_refresh_token IS NOT NULL");
@@ -62,6 +66,7 @@ function migrate(database: DatabaseSync): void {
   add("learning_question", "learning_question TEXT");
   add("learning_guidance", "learning_guidance TEXT");
   add("image_paths", "image_paths TEXT");
+  add("revision", "revision INTEGER NOT NULL DEFAULT 1");
   database.exec("UPDATE submissions SET image_paths = json_array(image_path) WHERE image_paths IS NULL");
 
   const homework = database.prepare("PRAGMA table_info(homework_items)").all() as Array<{

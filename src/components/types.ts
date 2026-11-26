@@ -28,6 +28,7 @@ export interface SubmissionView {
   userName: string;
   imagePath: string;
   imagePaths: string[];
+  revision: number;
   createdAt: string;
   aiDone: boolean | null;
   aiCorrect: boolean | null;
@@ -44,10 +45,12 @@ export interface SubmissionView {
   aiDebug: (AssessmentEvidence & {
     initialAssessmentRejected?: boolean;
     verification?: AssessmentEvidence | null;
+    focusedRecheck?: AssessmentEvidence | null;
     verificationRawResponse: string;
   }) | null;
   manualTaskText: string | null;
   aiUsedManualTask: boolean;
+  aiManualTaskVerified: boolean;
   aiError: string | null;
   aiEvaluatedAt: string | null;
   learningReason: string | null;

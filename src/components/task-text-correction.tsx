@@ -34,7 +34,7 @@ export function TaskTextCorrection({ homeworkId, submission }: { homeworkId: str
         </div>
       ))}
       <p className="mt-3 text-sm leading-relaxed text-ink-soft">
-        Jeigu matai, kad sąlyga nuskaityta neteisingai, įvesk ją ranka. AI dar kartą patikrins pagal tavo tekstą; tėvai prieš pažymėdami darbą atliktu galės peržiūrėti rezultatą.
+        Jeigu matai, kad sąlyga nuskaityta neteisingai, įvesk ją ranka. AI patikrins tavo tekstą ir palygins jį su nuotraukoje matoma sąlyga.
       </p>
       {!open ? (
         <button type="button" className="btn btn-outline mt-3 w-full" onClick={() => setOpen(true)}>

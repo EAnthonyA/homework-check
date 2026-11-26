@@ -43,7 +43,7 @@ export async function POST(request: Request, ctx: RouteContext<"/api/homework/[i
   const submission = getSubmission(session.id, homeworkId);
   if (!homework || !submission) return NextResponse.json({ error: "Darbo pateikimas nerastas." }, { status: 404 });
   if (homework.done_at) return NextResponse.json({ error: "Darbas jau pažymėtas kaip atliktas." }, { status: 409 });
-  if (submission.ai_done !== 1 || submission.ai_correct !== 0) {
+  if (submission.ai_correct !== 0 || !submission.ai_needs_work) {
     return NextResponse.json({ error: "Sąlygą galima patikslinti tik po AI pažymėtos klaidos." }, { status: 409 });
   }
 
@@ -70,7 +70,7 @@ export async function POST(request: Request, ctx: RouteContext<"/api/homework/[i
       aiCorrect: ai.correct,
       aiCanVerifyCorrectness: ai.canVerifyCorrectness,
       aiNeedsClearerPhoto: ai.needsClearerPhoto,
-      aiSummary: ai.correct === true
+      aiSummary: ai.correct === true && !ai.debug.manualTaskVerified
         ? "AI patikrino pagal ranka įvestą sąlygą. Tėvai, peržiūrėkite prieš žymėdami darbą atliktu."
         : ai.summary,
       aiGoodParts: ai.goodParts,
@@ -78,7 +78,9 @@ export async function POST(request: Request, ctx: RouteContext<"/api/homework/[i
       aiDebug: JSON.stringify(ai.debug),
       manualTaskText: taskText,
       aiUsedManualTask: true,
+      manualTaskVerified: ai.debug.manualTaskVerified,
       expectedSubmissionImagePaths: imagePaths,
+      expectedRevision: submission.revision,
       aiEvaluatedAt: new Date().toISOString(),
     }, homework.completion_version);
     if (!committed) return NextResponse.json({ error: "Darbo būsena pasikeitė. Atnaujink puslapį." }, { status: 409 });
