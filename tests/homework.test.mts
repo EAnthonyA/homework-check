@@ -632,3 +632,12 @@ test("older rejected assessments remain marked as rejected and hidden from child
   assert.equal(submissionView(saved, true).aiDebug?.initialAssessmentRejected, true);
   assert.deepEqual(submissionView(saved).aiReadings, []);
 });
+
+test("tutor usage is limited per child and resets after an hour", () => {
+  const start = 2_000_000_000_000;
+  for (let i = 0; i < 30; i++) assert.equal(repo.consumeTutorRequest("kid", start + i), true);
+  assert.equal(repo.consumeTutorRequest("kid", start + 30), false);
+  assert.equal(repo.consumeTutorRequest("parent", start + 30), true);
+  assert.equal(repo.consumeTutorRequest("kid", start + 3_600_000), true);
+  assert.equal(repo.consumeTutorRequest("kid", start + 3_600_001), true);
+});

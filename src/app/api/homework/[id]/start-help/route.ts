@@ -1,10 +1,22 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { createStartingHelp, isAiConfigured } from "@/lib/ai";
-import { getHomeworkById } from "@/lib/repo";
+import { consumeTutorRequest, getHomeworkById } from "@/lib/repo";
 import { sanitizeFreeText } from "@/lib/sanitize";
 import { validatePhotos } from "@/lib/upload-rules";
 import { parseHelpHistory } from "@/lib/starting-help-history";
+
+function validateTutorRequest(userId: string, mode: string, question: string): NextResponse | null {
+  if (mode === "followup" && !question) {
+    return NextResponse.json({ error: "Parašyk klausimą." }, { status: 400 });
+  }
+
+  if (!consumeTutorRequest(userId)) {
+    return NextResponse.json({ error: "Kol kas pakanka klausimų. Pabandyk vėliau arba paprašyk tėvų pagalbos." }, { status: 429 });
+  }
+
+  return null;
+}
 
 export async function POST(request: Request, ctx: RouteContext<"/api/homework/[id]/start-help">) {
   const session = await getSession();
@@ -20,8 +32,6 @@ export async function POST(request: Request, ctx: RouteContext<"/api/homework/[i
 
   if (homework.done_at) return NextResponse.json({ error: "Darbas jau atliktas." }, { status: 409 });
 
-  if (!isAiConfigured()) return NextResponse.json({ error: "Pagalba dabar nepasiekiama. Gali paprašyti tėvų pagalbos." }, { status: 503 });
-
   const form = await request.formData().catch(() => null);
 
   if (!form) return NextResponse.json({ error: "Netinkami duomenys." }, { status: 400 });
@@ -34,15 +44,20 @@ export async function POST(request: Request, ctx: RouteContext<"/api/homework/[i
 
   const files = form.getAll("photo");
 
-  if (files.length > 1 || !files.every((file): file is File => file instanceof File)) return NextResponse.json({ error: "Pasirink vieną nuotrauką." }, { status: 400 });
+  if (files.length !== 1 || !files.every((file): file is File => file instanceof File)) return NextResponse.json({ error: "Pridėk vieną užduoties nuotrauką." }, { status: 400 });
 
   try {
-    if (files.length) validatePhotos(files);
+    validatePhotos(files);
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Netinkama nuotrauka." }, { status: 400 });
   }
 
+  if (!isAiConfigured()) return NextResponse.json({ error: "Pagalba dabar nepasiekiama. Gali paprašyti tėvų pagalbos." }, { status: 503 });
+
   const field = (key: string, max: number) => sanitizeFreeText(typeof form.get(key) === "string" ? form.get(key) as string : "", max);
+
+  const validationError = validateTutorRequest(session.id, mode, field("question", 600));
+  if (validationError) return validationError;
 
   try {
     const result = await createStartingHelp({

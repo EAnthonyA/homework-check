@@ -65,6 +65,12 @@ CREATE TABLE IF NOT EXISTS homework_help_requests (
   PRIMARY KEY (user_id, homework_id)
 );
 
+CREATE TABLE IF NOT EXISTS tutor_usage (
+  user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  window_started INTEGER NOT NULL,
+  request_count INTEGER NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS assessment_items (
   id TEXT PRIMARY KEY,
   source_id TEXT UNIQUE NOT NULL,

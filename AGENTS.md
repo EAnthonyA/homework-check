@@ -76,6 +76,7 @@ Full setup and env vars: see `README.md`.
 - React Query: `useQuery` + `fetch` for GET; `useMutation` for POST/PATCH side effects. Never use a POST endpoint as `queryFn`. Defaults: `staleTime: 30_000`, `retry: 1`.
 - UI text is hardcoded Lithuanian inline in components (`<html lang="lt">`). There is no i18n layer yet — README mentions `src/i18n/`, but that directory does not exist.
 - Design tokens are defined in `src/app/globals.css` (`@theme`). Use the utilities (e.g. `bg-sheet`, `bg-paper`, `text-ink`, `text-ink-soft`, `text-ink-faint`, `font-display`, `font-hand`, `rounded-card`, `text-pen`, `text-leaf-deep`, `border-rule`) and the shared `.sheet` / `.btn` classes rather than arbitrary values.
+- For UX changes, capture and show the user screenshots of the complete affected user journey, including the key steps and resulting states. Use a mobile browser viewport representative of a Xiaomi Redmi Note 12 Pro, which the child uses. Present the screenshots for the user's review and ask for explicit approval of the UX before considering the change complete. If screenshots cannot be captured, explain the blocker and do not claim approval.
 
 ## Pitfalls
 

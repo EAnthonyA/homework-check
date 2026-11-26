@@ -7,8 +7,9 @@ import { MAX_PHOTOS, validatePhotos } from "@/lib/upload-rules";
 
 type DraftPhoto = { file: File; url: string };
 
-export function PhotoSubmission({ homeworkId, replacing, onResult }: {
+export function PhotoSubmission({ homeworkId, replacing, onResult, visible }: {
   homeworkId: string;
+  visible: boolean;
   replacing: boolean;
   onResult: (message: string) => void;
 }) {
@@ -74,14 +75,14 @@ export function PhotoSubmission({ homeworkId, replacing, onResult }: {
   }
 
   return (
-    <div className="mt-4 border-t border-dashed border-rule pt-4" aria-busy={upload.isPending}>
+    <div className="mt-2" hidden={!visible} aria-busy={upload.isPending}>
       <div className="flex items-baseline justify-between gap-2">
-        <p className="text-sm font-medium text-ink">{replacing ? "Pateikti iš naujo" : "Tavo sprendimas"}</p>
-        <span className="text-xs text-ink-soft">{photos.length} / {MAX_PHOTOS} nuotraukos</span>
+        <p className="text-base font-semibold text-ink">{replacing ? "Pateikti iš naujo" : "Atlikai? Pateik sprendimą"}</p>
+        <span className="shrink-0 text-xs text-ink-soft" aria-label={`${photos.length} iš ${MAX_PHOTOS} nuotraukų`}>{photos.length} / {MAX_PHOTOS}</span>
       </div>
       <p className="mt-1 text-xs leading-relaxed text-ink-soft">
         {replacing ? "Naujos nuotraukos pakeis ankstesnį pateikimą. " : ""}
-        Pridėk sprendimus ir užduočių puslapį su klausimais. Užduotis fotografuok tiesiai iš viršaus ir stambiai — spausdintos eilutės turi užimti didžiąją nuotraukos dalį. Įvertinsiu viską kartu. Iki 10 MB vienai nuotraukai.
+        Nufotografuok sprendimus ir užduočių puslapį. Fotografuok tiesiai ir stambiai, kad matytųsi klausimai. Iki 10 MB vienai nuotraukai.
       </p>
       {photos.length > 0 && (
         <ol className="mt-3 grid grid-cols-3 gap-2">
