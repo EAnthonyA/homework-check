@@ -1,10 +1,22 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { createStartingHelp, isAiConfigured } from "@/lib/ai";
-import { getHomeworkById } from "@/lib/repo";
+import { consumeTutorRequest, getHomeworkById } from "@/lib/repo";
 import { sanitizeFreeText } from "@/lib/sanitize";
 import { validatePhotos } from "@/lib/upload-rules";
 import { parseHelpHistory } from "@/lib/starting-help-history";
+
+function validateTutorRequest(userId: string, mode: string, question: string): NextResponse | null {
+  if (mode === "followup" && !question) {
+    return NextResponse.json({ error: "Parašyk klausimą." }, { status: 400 });
+  }
+
+  if (!consumeTutorRequest(userId)) {
+    return NextResponse.json({ error: "Kol kas pakanka klausimų. Pabandyk vėliau arba paprašyk tėvų pagalbos." }, { status: 429 });
+  }
+
+  return null;
+}
 
 export async function POST(request: Request, ctx: RouteContext<"/api/homework/[id]/start-help">) {
   const session = await getSession();
@@ -43,6 +55,9 @@ export async function POST(request: Request, ctx: RouteContext<"/api/homework/[i
   }
 
   const field = (key: string, max: number) => sanitizeFreeText(typeof form.get(key) === "string" ? form.get(key) as string : "", max);
+
+  const validationError = validateTutorRequest(session.id, mode, field("question", 600));
+  if (validationError) return validationError;
 
   try {
     const result = await createStartingHelp({

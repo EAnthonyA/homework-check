@@ -8,6 +8,20 @@ import { MAX_PHOTOS } from "./upload-rules";
 
 export type Role = "parent" | "kid";
 
+// An atomic fixed window shared by all homework items for this user.
+export function consumeTutorRequest(userId: string, now = Date.now()): boolean {
+  const hourAgo = now - 60 * 60 * 1000;
+  const result = getDb().prepare(`
+    INSERT INTO tutor_usage (user_id, window_started, request_count) VALUES (?, ?, 1)
+    ON CONFLICT(user_id) DO UPDATE SET
+      window_started = CASE WHEN window_started <= ? THEN excluded.window_started ELSE window_started END,
+      request_count = CASE WHEN window_started <= ? THEN 1 ELSE request_count + 1 END
+    WHERE window_started <= ? OR request_count < 30
+  `).run(userId, now, hourAgo, hourAgo, hourAgo);
+
+  return result.changes === 1;
+}
+
 export interface UserRow {
   id: string;
   google_sub: string;
